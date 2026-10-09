@@ -1,115 +1,80 @@
-// src/components/Footer.jsx
-import {
-  FaFacebook,
-  FaInstagram,
-  FaTelegram,
-  FaYoutube,
-  FaLinkedin,
-  FaEnvelope,
-  FaPhoneAlt,
-  FaMapMarkedAlt,
-} from "react-icons/fa";
+import { Instagram, Send, Youtube } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-100 mt-auto">
-      {/* GRID: compact version */}
-      <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-center lg:text-left">
-        
-        {/* Quick Links */}
-{/* Quick Links */}
-<div className="flex flex-col items-center lg:items-start gap-2 pl-6 lg:pl-6">
-  <h2 className="text-lg font-semibold mb-1">Quick Links</h2>
-  <ul className="space-y-2 text-white text-base">
-    {["Home", "Dashboard", "Test Series", "Pricing", "About", "Contact"].map((link) => (
-      <li key={link}>
-        <a
-          href={`/${link.toLowerCase().replace(" ", "")}`}
-          className="inline-block text-white font-medium transition transform hover:scale-105 hover:text-white"
-        >
-          {link}
-        </a>
-      </li>
-    ))}
-  </ul>
-</div>
+    <footer
+      id="contact"
+      className="scroll-mt-24 border-t border-yellow-100 bg-[#FFF9EA]"
+    >
+      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-10 md:grid-cols-3">
+        <div>
+          <a href="#top" className="text-xl font-extrabold text-yellow-500">
+            ExamByte
+          </a>
 
-
-
-        {/* Contact */}
-<div className="flex flex-col items-center lg:items-start gap-3">
-  <h2 className="text-lg font-semibold mb-1">Contact</h2>
-
-  <div className="flex items-center gap-2 text-gray-300 text-base md:text-lg">
-    <FaEnvelope className="shrink-0" />
-    <span className="font-medium">support@csattestseries.com</span>
-  </div>
-
-  <div className="flex items-center gap-2 text-gray-300 text-base md:text-lg">
-    <FaPhoneAlt className="shrink-0" />
-    <span className="font-medium">+91-9876543210</span>
-  </div>
-
-  <div className="flex items-center gap-2 text-gray-300 text-base md:text-lg">
-    <FaMapMarkedAlt className="shrink-0" />
-    <span className="font-medium">Mumbai, India</span>
-  </div>
-</div>
-
-
-        {/* Subscribe + Socials */}
-        <div className="flex flex-col items-center lg:items-start gap-3">
-          <h2 className="text-lg font-semibold mb-1">Subscribe & Follow</h2>
-          <p className="text-gray-300 text-sm max-w-xs text-center lg:text-left">
-            Get test notifications straight to your inbox.
+          <p className="mt-3 max-w-sm text-sm leading-6 text-slate-600">
+            Simple study material for focused learning.
           </p>
+        </div>
 
-         <form className="w-full max-w-xs mt-1">
-  <div className="flex w-full gap-2">
-    <input
-      type="email"
-      placeholder="Enter your email"
-      className="flex-1 px-4 py-2 rounded-md text-gray-900 bg-white focus:outline-none border-none text-base"
-    />
-    <button
-      type="submit"
-      className="bg-blue-600 px-4 py-2 rounded-md text-white hover:bg-blue-700 transition text-base"
-    >
-      Subscribe
-    </button>
-  </div>
-</form>
+        <div>
+          <h3 className="font-bold text-slate-900">Material</h3>
 
+          <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
+            <a href="#study-material" className="hover:text-yellow-700">
+              Study Material
+            </a>
+            <a href="#bundles" className="hover:text-yellow-700">
+              PDF Bundles
+            </a>
+            <a href="#free-sample" className="hover:text-yellow-700">
+              Free Sample
+            </a>
+          </div>
+        </div>
 
+        <div>
+          <h3 className="font-bold text-slate-900">Follow ExamByte</h3>
 
-          {/* Social Icons under Subscribe */}
-<div className="flex gap-5 mt-2 justify-center lg:justify-start text-2xl">
-  {[FaFacebook, FaInstagram, FaTelegram, FaYoutube, FaLinkedin].map((Icon, idx) => (
-    <a
-      key={idx}
-      href="#"
-      className="text-white transition transform hover:scale-110 hover:text-white"
-    >
-      <Icon />
-    </a>
-  ))}
-</div>
+          <div className="mt-4 flex gap-3">
+            <a
+              href="https://www.instagram.com/exambyteindia/"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-pink-100 p-3 text-pink-600 transition hover:bg-pink-200"
+              aria-label="Instagram"
+              title="Instagram"
+            >
+              <Instagram size={20} />
+            </a>
 
+            <a
+              href="https://www.youtube.com/@YOUR_CHANNEL"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-red-100 p-3 text-red-600 transition hover:bg-red-200"
+              aria-label="YouTube"
+              title="YouTube"
+            >
+              <Youtube size={20} />
+            </a>
+
+            <a
+              href="https://t.me/YOUR_CHANNEL"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-blue-100 p-3 text-blue-600 transition hover:bg-blue-200"
+              aria-label="Telegram"
+              title="Telegram"
+            >
+              <Send size={20} />
+            </a>
+          </div>
         </div>
       </div>
 
-      {/* bottom bar */}
-      <div className="border-t border-gray-800 mt-4">
-        <div className="max-w-7xl mx-auto px-6 py-4 text-center">
-          <p className="text-sm text-gray-400">
-            © {new Date().getFullYear()} UPSC CSAT Test Series. All rights reserved.
-          </p>
-          <div className="flex justify-center gap-4 text-sm mt-1">
-            <a href="/privacy" className="text-gray-400 hover:text-white">Privacy</a>
-            <a href="/terms" className="text-gray-400 hover:text-white">Terms</a>
-            <a href="/faq" className="text-gray-400 hover:text-white">FAQ</a>
-          </div>
-        </div>
+      <div className="border-t border-yellow-100 px-6 py-5 text-center text-sm text-slate-500">
+        © {new Date().getFullYear()} ExamByte · Privacy · Terms · Refund Policy
       </div>
     </footer>
   );

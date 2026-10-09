@@ -1,165 +1,306 @@
-import React, { useState } from "react";
-import { FcGoogle } from "react-icons/fc";
+import { useState } from "react";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
-export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    mobile: "",
-  });
+export default function Register() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const [errors, setErrors] = useState({});
-  const [success, setSuccess] = useState(false);
+  const requestedDestination =
+    searchParams.get("returnTo") ||
+    searchParams.get("redirect") ||
+    location.state?.from;
 
-  // Validation
-  const validate = () => {
-    let newErrors = {};
-    if (!formData.fullName.trim()) newErrors.fullName = "Full name is required.";
-    if (!formData.email.includes("@")) newErrors.email = "Invalid email address.";
-    if (formData.password.length < 6)
-      newErrors.password = "Password must be at least 6 characters.";
-    if (formData.password !== formData.confirmPassword)
-      newErrors.confirmPassword = "Passwords do not match.";
-    if (!/^\+?\d{10,15}$/.test(formData.mobile))
-      newErrors.mobile = "Enter valid mobile number with country code.";
-    return newErrors;
-  };
+  const destination =
+    typeof requestedDestination === "string" &&
+    requestedDestination.startsWith("/") &&
+    !requestedDestination.startsWith("//")
+      ? requestedDestination
+      : "/my-purchases";
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const [method, setMethod] = useState("otp");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const validationErrors = validate();
-    setErrors(validationErrors);
+  async function sendCode(event) {
+    event.preventDefault();
+    setError("");
 
-    if (Object.keys(validationErrors).length === 0) {
-      setSuccess(true);
-      console.log("User registered:", formData);
-      alert("Verification link sent to your email!");
-    } else {
-      setSuccess(false);
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanMobile = mobile.trim();
+
+    if (method === "password") {
+      if (password.length < 8) {
+        setError("Use a password with at least 8 characters.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Your passwords do not match.");
+        return;
+      }
     }
-  };
+
+    setBusy(true);
+
+    try {
+      const userData = {
+        full_name: cleanName,
+        mobile: cleanMobile,
+      };
+
+      if (method === "password") {
+        const { data, error: signupError } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: { data: userData },
+        });
+
+        if (signupError) {
+          setError(signupError.message);
+          return;
+        }
+
+        if (data.session) {
+          navigate(destination, { replace: true });
+          return;
+        }
+      } else {
+        const { error: sendError } = await supabase.auth.signInWithOtp({
+          email: cleanEmail,
+          options: {
+            shouldCreateUser: true,
+            data: userData,
+          },
+        });
+
+        if (sendError) {
+          setError(sendError.message);
+          return;
+        }
+      }
+
+      setEmail(cleanEmail);
+      setCodeSent(true);
+    } catch {
+      setError("Could not start registration. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyCode(event) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+
+    try {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: code.trim(),
+        type: "email",
+      });
+
+      if (verifyError) {
+        setError(verifyError.message);
+        return;
+      }
+
+      navigate(destination, { replace: true });
+    } catch {
+      setError("Could not verify the code. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="min-h-screen w-full bg-white flex items-center justify-center p-6">
-      {/* Registration Card */}
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl border">
-        <h1 className="text-2xl font-bold text-center mb-2">
-          Welcome to UPSC CSAT
-        </h1>
-        <p className="text-center text-gray-600 mb-6">
-          Register to Continue
-        </p>
+    <main className="min-h-screen bg-[#F8F7F2] px-4 py-6 text-slate-900 dark:bg-slate-950 dark:text-white sm:px-6">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex items-center justify-between">
+          <Link to="/" className="text-xl font-extrabold tracking-tight">
+            Exam<span className="text-amber-500">Byte</span>
+          </Link>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
+            <ArrowLeft size={16} />
+            Back to materials
+          </Link>
+        </header>
 
-        {/* Google Login */}
-        <div className="mb-6">
-          <button className="w-full flex items-center justify-center border border-gray-300 rounded-lg py-3 hover:bg-gray-100 transition shadow-sm bg-white text-gray-800 font-medium">
-            <FcGoogle size={22} className="mr-2" />
-            Continue with Google
-          </button>
-        </div>
+        <section className="mx-auto mt-10 max-w-xl rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:p-10">
+          <p className="text-sm font-semibold text-amber-600">GET STARTED</p>
+          <h1 className="mt-2 text-3xl font-bold">
+            {codeSent ? "Verify your email" : "Create your account"}
+          </h1>
+          <p className="mt-2 text-slate-600 dark:text-slate-300">
+            {codeSent
+              ? `Enter the one-time code sent to ${email}.`
+              : "Add your details, then choose how you want to secure your account."}
+          </p>
 
-        {/* Divider */}
-        <p className="text-center text-gray-500 text-sm mb-4">or sign up with email</p>
+          {!codeSent ? (
+            <form onSubmit={sendCode} className="mt-7 space-y-4">
+              <label className="block text-sm font-medium">
+                Full name
+                <input
+                  required
+                  autoComplete="name"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </label>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full Name */}
-          <input
-            type="text"
-            name="fullName"
-            placeholder="Full Name"
-            value={formData.fullName}
-            onChange={handleChange}
-            autoComplete="off"
-            className="w-full px-4 py-3 border rounded-lg focus:ring focus:ring-blue-200 bg-white text-gray-800 placeholder-gray-400"
-            required
-          />
-          {errors.fullName && <p className="text-red-600 text-sm">{errors.fullName}</p>}
+              <label className="block text-sm font-medium">
+                Email address
+                <input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </label>
 
-          {/* Email */}
-          <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={handleChange}
-            autoComplete="off"
-            className="w-full px-4 py-3 border rounded-lg focus:ring focus:ring-blue-200 bg-white text-gray-800 placeholder-gray-400"
-            required
-          />
-          {errors.email && <p className="text-red-600 text-sm">{errors.email}</p>}
+              <label className="block text-sm font-medium">
+                Mobile number
+                <input
+                  required
+                  type="tel"
+                  autoComplete="tel"
+                  value={mobile}
+                  onChange={(event) => setMobile(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </label>
 
-          {/* Password */}
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            autoComplete="new-password" // prevents Chrome saved-password popup
-            className="w-full px-4 py-3 border rounded-lg focus:ring focus:ring-blue-200 bg-white text-gray-800 placeholder-gray-400"
-            required
-          />
-          {errors.password && <p className="text-red-600 text-sm">{errors.password}</p>}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ["otp", "Email code"],
+                  ["password", "Set a password"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setMethod(value);
+                      setError("");
+                    }}
+                    className={`rounded-xl border px-3 py-3 text-sm font-bold ${
+                      method === value
+                        ? "border-amber-500 bg-amber-100 text-slate-950"
+                        : "border-slate-200 dark:border-slate-700"
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-          {/* Confirm Password */}
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            autoComplete="new-password"
-            className="w-full px-4 py-3 border rounded-lg focus:ring focus:ring-blue-200 bg-white text-gray-800 placeholder-gray-400"
-            required
-          />
-          {errors.confirmPassword && (
-            <p className="text-red-600 text-sm">{errors.confirmPassword}</p>
+              {method === "password" && (
+                <>
+                  <label className="block text-sm font-medium">
+                    Password
+                    <input
+                      required
+                      type="password"
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </label>
+
+                  <label className="block text-sm font-medium">
+                    Confirm password
+                    <input
+                      required
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </label>
+                </>
+              )}
+
+              <button
+                disabled={busy}
+                className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">
+                {busy ? "Sending code…" : "Continue"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={verifyCode} className="mt-7 space-y-4">
+              <label className="block text-sm font-medium">
+                One-time code
+                <input
+                  required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </label>
+
+              <button
+                disabled={busy}
+                className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">
+                {busy ? "Verifying…" : "Verify and create account"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCodeSent(false);
+                  setCode("");
+                  setError("");
+                }}
+                className="w-full text-sm font-semibold text-amber-700 dark:text-amber-300">
+                Change my details
+              </button>
+            </form>
           )}
 
-          {/* Mobile */}
-          <input
-            type="tel"
-            name="mobile"
-            placeholder="Mobile Number (e.g. +919876543210)"
-            value={formData.mobile}
-            onChange={handleChange}
-            autoComplete="off"
-            className="w-full px-4 py-3 border rounded-lg focus:ring focus:ring-blue-200 bg-white text-gray-800 placeholder-gray-400"
-            required
-          />
-          {errors.mobile && <p className="text-red-600 text-sm">{errors.mobile}</p>}
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 text-sm font-semibold text-rose-700">
+              {error}
+            </p>
+          )}
 
-          {/* Submit */}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700 transition"
-          >
-            Register
-          </button>
-        </form>
-
-        {/* Success */}
-        {success && (
-          <p className="text-green-600 text-center mt-3 animate-bounce">
-            ✅ Registration successful! Check your email to verify.
+          <p className="mt-5 text-center text-sm text-slate-600 dark:text-slate-300">
+            Already registered?{" "}
+            <Link
+              to={`/login?returnTo=${encodeURIComponent(destination)}`}
+              className="font-semibold text-amber-700 dark:text-amber-300">
+              Log in
+            </Link>
           </p>
-        )}
-
-        {/* Link to login */}
-        <p className="text-center text-gray-600 text-sm mt-4">
-          Already have an account?{" "}
-          <a href="/login" className="text-blue-600 hover:underline">
-            Log In
-          </a>
-        </p>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

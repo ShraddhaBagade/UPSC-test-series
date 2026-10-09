@@ -1,175 +1,85 @@
-/* src/index.css */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 
-/* Tailwind Directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-
-html, body, #root {
-  height: 100%;
-  width: 100%;    /* ✅ make sure full width of the screen */
-  margin: 0;
-  padding: 0;
+* {
+  box-sizing: border-box;
 }
 
-
-/* Custom global styles */
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+html {
+  scroll-behavior: smooth;
+  background: #fbfcff;
 }
 
-/* Links */
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-/* Body setup */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  place-items: center;
-  background-color: #242424;
-  color: rgba(255, 255, 255, 0.87);
+  font-family: "Manrope", sans-serif;
+  background: #fbfcff;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 700;
+#root {
+  min-height: 100vh;
 }
 
-/* Buttons */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1rem;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
-  transition: all 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* QR Code wrapper */
-.qr-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+::selection {
+  background: #fde68a;
+  color: #1e293b;
+}
+html.dark body {
+  background: #111827;
+  color: #e2e8f0;
 }
 
-/*Top Ticker */
-/* Prevent entire page horizontal scroll */
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden; /* ⬅️ this ensures no horizontal scrollbar */
+html.dark [class~="bg-white"],
+html.dark [class~="bg-white/90"] {
+  background-color: #1e293b !important;
 }
 
-/* Ticker styles */
-.ticker-container {
-  width: 100%;
-  overflow: hidden;         /* hides extra text */
-  background: orange;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  position: relative;
+html.dark [class~="bg-[#FBFCFF]"],
+html.dark [class~="bg-[#FFF9EA]"] {
+  background-color: #111827 !important;
 }
 
-.marquee-wrapper {
-  display: flex;
-  flex-wrap: nowrap;
-  position: absolute;       /* ⬅️ important: takes it out of document flow */
-  white-space: nowrap;
-  animation: marquee 30s linear infinite;
+html.dark [class~="bg-gradient-to-br"] {
+  background-image: linear-gradient(
+    135deg,
+    #111827,
+    #172033,
+    #1e1b4b
+  ) !important;
 }
 
-.marquee-wrapper:hover {
-  animation-play-state: paused;
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #e2e8f0 !important;
 }
 
-.marquee-content {
-  white-space: nowrap;
-  padding-right: 4rem;
-  color: white;
-  font-weight: 600;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-  font-size: 16px;
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #b6c2d2 !important;
 }
 
-/* Continuous scroll */
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-yellow-100 {
+  border-color: #334155 !important;
 }
-
-/* Fade edges */
-.ticker-container::before,
-.ticker-container::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: 50px;
-  height: 100%;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.ticker-container::before {
-  left: 0;
-  background: linear-gradient(to right, orange, transparent);
-}
-
-.ticker-container::after {
-  right: 0;
-  background: linear-gradient(to left, orange, transparent);
-}
-
-
-
-/* Responsive adjustments */
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
- 
