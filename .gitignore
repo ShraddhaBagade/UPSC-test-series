@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Paid PDFs
+server/private-pdfs/
+
+# Local order and customer data
+server/data/
+
+# Logs
+*.log

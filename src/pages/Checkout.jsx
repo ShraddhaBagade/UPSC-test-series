@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { authFetch } from "../lib/authFetch";
-import { useAuth } from "../lib/AuthContext";
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,7 +9,8 @@ import {
   Phone,
   UserRound,
 } from "lucide-react";
-
+import { authFetch } from "../lib/authFetch";
+import { useAuth } from "../lib/AuthContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import TestDownloads from "../components/TestDownloads";
@@ -62,7 +61,7 @@ async function postJson(url, body) {
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [purchase] = useState(readPendingPurchase);
 
   const [customer, setCustomer] = useState(() => {
@@ -101,6 +100,13 @@ export default function Checkout() {
 
   async function startPayment(event) {
     event.preventDefault();
+    setError("");
+    setNotice("");
+
+    if (authLoading) {
+      setNotice("Checking your login. Please wait a moment.");
+      return;
+    }
 
     const fullName = customer.fullName.trim();
     const email = customer.email.trim().toLowerCase();
@@ -132,8 +138,6 @@ export default function Checkout() {
     }
 
     setBusy(true);
-    setError("");
-    setNotice("");
 
     if (!user) {
       sessionStorage.setItem(
@@ -143,13 +147,16 @@ export default function Checkout() {
           customer: { fullName, email, mobile },
         }),
       );
+
       navigate("/login?returnTo=/checkout");
       return;
     }
+
     if (user.email_confirmed_at && user.email.toLowerCase() !== email) {
       setError(
         `You're signed in as ${user.email}. Use that email here, or log out and sign in with the other email before buying.`,
       );
+      setBusy(false);
       return;
     }
 
@@ -380,6 +387,7 @@ export default function Checkout() {
                     </div>
 
                     <TestDownloads payment={verifiedPayment} />
+
                     <Link
                       to="/my-purchases"
                       className="mt-5 inline-flex rounded-xl bg-amber-400 px-5 py-3 font-bold text-slate-950 hover:bg-amber-300">
@@ -484,11 +492,13 @@ export default function Checkout() {
 
                     <button
                       type="submit"
-                      disabled={busy}
+                      disabled={busy || authLoading}
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-4 font-bold text-white shadow-md shadow-yellow-200 transition hover:bg-yellow-600 disabled:cursor-wait disabled:opacity-60 dark:bg-amber-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-amber-300">
-                      {busy
-                        ? "Preparing test payment…"
-                        : `Continue to test payment · ${purchase.price}`}
+                      {authLoading
+                        ? "Checking your login…"
+                        : busy
+                          ? "Preparing test payment…"
+                          : `Continue to test payment · ${purchase.price}`}
 
                       <ArrowRight size={18} />
                     </button>

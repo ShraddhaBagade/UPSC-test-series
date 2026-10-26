@@ -1,17 +1,24 @@
 import { supabase } from "./supabase";
 
 export async function authFetch(url, options = {}) {
-  const { data, error } = await supabase.auth.getSession();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
 
-  if (error || !data.session?.access_token) {
-    throw new Error("Please log in again.");
+  if (error) {
+    throw new Error(error.message || "Could not check your login.");
   }
+
+  if (!session?.access_token) {
+    throw new Error("Please log in and try again.");
+  }
+
+  const headers = new Headers(options.headers || {});
+  headers.set("Authorization", `Bearer ${session.access_token}`);
 
   return fetch(url, {
     ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${data.session.access_token}`,
-    },
+    headers,
   });
 }

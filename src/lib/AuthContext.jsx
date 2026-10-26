@@ -10,25 +10,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth
-      .getUser()
-      .then(({ data }) => {
-        if (active) {
-          setUser(data.user || null);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (active) {
-        setUser(session?.user || null);
-        setLoading(false);
-      }
+      if (!active) return;
+
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => {
@@ -46,6 +34,10 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const value = useContext(AuthContext);
-  if (!value) throw new Error("useAuth requires AuthProvider");
+
+  if (!value) {
+    throw new Error("useAuth requires AuthProvider");
+  }
+
   return value;
 }

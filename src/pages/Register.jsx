@@ -1,29 +1,34 @@
 import { useState } from "react";
 import {
   Link,
+  Navigate,
   useLocation,
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useAuth } from "../lib/AuthContext";
 import { supabase } from "../lib/supabase";
 
 export default function Register() {
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  const requestedDestination =
-    searchParams.get("returnTo") ||
-    searchParams.get("redirect") ||
-    location.state?.from;
+  const stateFrom =
+    typeof location.state?.from === "string"
+      ? location.state.from
+      : location.state?.from?.pathname;
 
-  const destination =
-    typeof requestedDestination === "string" &&
-    requestedDestination.startsWith("/") &&
-    !requestedDestination.startsWith("//")
-      ? requestedDestination
-      : "/my-purchases";
+  const requestedDestination =
+    searchParams.get("returnTo") || searchParams.get("redirect") || stateFrom;
+
+  const destination = ["/checkout", "/my-purchases"].includes(
+    requestedDestination,
+  )
+    ? requestedDestination
+    : "/my-purchases";
 
   const [method, setMethod] = useState("otp");
   const [fullName, setFullName] = useState("");
@@ -76,6 +81,8 @@ export default function Register() {
           return;
         }
 
+        // When email confirmation is disabled, Supabase may create
+        // the session immediately.
         if (data.session) {
           navigate(destination, { replace: true });
           return;
@@ -129,6 +136,14 @@ export default function Register() {
     }
   }
 
+  if (loading) {
+    return <p className="p-8">Checking your login…</p>;
+  }
+
+  if (user) {
+    return <Navigate to={destination} replace />;
+  }
+
   return (
     <main className="min-h-screen bg-[#F8F7F2] px-4 py-6 text-slate-900 dark:bg-slate-950 dark:text-white sm:px-6">
       <div className="mx-auto max-w-6xl">
@@ -136,6 +151,7 @@ export default function Register() {
           <Link to="/" className="text-xl font-extrabold tracking-tight">
             Exam<span className="text-amber-500">Byte</span>
           </Link>
+
           <Link
             to="/"
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
@@ -146,9 +162,11 @@ export default function Register() {
 
         <section className="mx-auto mt-10 max-w-xl rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:p-10">
           <p className="text-sm font-semibold text-amber-600">GET STARTED</p>
+
           <h1 className="mt-2 text-3xl font-bold">
             {codeSent ? "Verify your email" : "Create your account"}
           </h1>
+
           <p className="mt-2 text-slate-600 dark:text-slate-300">
             {codeSent
               ? `Enter the one-time code sent to ${email}.`
@@ -200,6 +218,7 @@ export default function Register() {
                   <button
                     key={value}
                     type="button"
+                    aria-pressed={method === value}
                     onClick={() => {
                       setMethod(value);
                       setError("");
@@ -247,7 +266,13 @@ export default function Register() {
               <button
                 disabled={busy}
                 className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">
-                {busy ? "Sending code…" : "Continue"}
+                {busy
+                  ? method === "otp"
+                    ? "Sending code…"
+                    : "Creating account…"
+                  : method === "otp"
+                    ? "Send email code"
+                    : "Create account"}
               </button>
             </form>
           ) : (
@@ -286,7 +311,7 @@ export default function Register() {
           {error && (
             <p
               role="alert"
-              className="mt-4 text-sm font-semibold text-rose-700">
+              className="mt-4 text-sm font-semibold text-rose-700 dark:text-rose-300">
               {error}
             </p>
           )}
