@@ -219,11 +219,6 @@ export default function MyPurchases() {
                                 <ShieldCheck size={14} />
                                 Payment verified
                               </span>
-                              {purchase.mode === "test" && (
-                                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                                  Test mode
-                                </span>
-                              )}
                             </div>
 
                             <h2 className="mt-3 text-xl font-extrabold sm:text-2xl">
@@ -252,9 +247,9 @@ export default function MyPurchases() {
               )}
 
               <p className="mt-7 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Purchases are linked to your account. Test Mode downloads are
-                sample receipts; full PDFs remain private until live delivery is
-                enabled.
+                Purchases are linked to your ExamByte account. Download links
+                are secure and available only for PDFs included in your verified
+                purchase.
               </p>
             </div>
           </section>

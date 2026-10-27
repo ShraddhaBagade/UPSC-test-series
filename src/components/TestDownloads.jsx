@@ -7,8 +7,9 @@ function getSubjectImage(subjectId, title) {
 
   if (value.includes("polity")) return "/images/subjects/polity.jpg";
   if (value.includes("modern")) return "/images/subjects/modern-india.jpg";
-  if (value.includes("geography"))
+  if (value.includes("geography")) {
     return "/images/subjects/indian-geography.jpg";
+  }
   if (value.includes("economic")) return "/images/subjects/economics.jpg";
   if (value.includes("environment")) return "/images/subjects/environment.jpg";
   if (value.includes("science") || value.includes("technology")) {
@@ -21,21 +22,6 @@ function getSubjectImage(subjectId, title) {
   return null;
 }
 
-function getFilename(disposition, fallback) {
-  const encodedMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-
-  if (encodedMatch) {
-    try {
-      return decodeURIComponent(encodedMatch[1]).replace(/[\\/]/g, "_");
-    } catch {
-      // Use the regular filename or fallback.
-    }
-  }
-
-  const regularMatch = disposition.match(/filename="?([^";]+)"?/i);
-  return regularMatch?.[1]?.replace(/[\\/]/g, "_") || fallback;
-}
-
 export default function TestDownloads({ payment }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
@@ -44,8 +30,8 @@ export default function TestDownloads({ payment }) {
   const subjectIds = Array.isArray(payment?.subjectIds)
     ? payment.subjectIds
     : [];
+
   const subjectNames = Array.isArray(payment?.subjects) ? payment.subjects : [];
-  const isLivePurchase = payment?.mode === "live";
 
   async function downloadFile(subjectId) {
     setBusyId(subjectId);
@@ -57,39 +43,31 @@ export default function TestDownloads({ payment }) {
       }
 
       const response = await authFetch(
-        `/api/download/${encodeURIComponent(payment.orderId)}/${encodeURIComponent(subjectId)}`,
+        `/api/download?orderId=${encodeURIComponent(
+          payment.orderId,
+        )}&subjectId=${encodeURIComponent(subjectId)}`,
       );
 
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type") || "";
-        let message = "Download unavailable.";
+      const text = await response.text();
+      let result = {};
 
-        if (contentType.includes("application/json")) {
-          const result = await response.json();
-          message = result.error || message;
-        } else {
-          const responseText = await response.text();
-          if (responseText) message = responseText.slice(0, 200);
-        }
-
-        throw new Error(message);
+      try {
+        result = text ? JSON.parse(text) : {};
+      } catch {
+        result = {};
       }
 
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      if (!response.ok || !result.url) {
+        throw new Error(result.error || "Download unavailable.");
+      }
 
-      link.href = objectUrl;
-      link.download = getFilename(
-        response.headers.get("content-disposition") || "",
-        `ExamByte-${subjectId}.${isLivePurchase ? "pdf" : "txt"}`,
-      );
+      const link = document.createElement("a");
+      link.href = result.url;
+      link.download = result.filename || `ExamByte-${subjectId}.pdf`;
 
       document.body.appendChild(link);
       link.click();
       link.remove();
-
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Download unavailable.",
@@ -104,8 +82,9 @@ export default function TestDownloads({ payment }) {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="text-lg font-extrabold">Your purchased subjects</h3>
+
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Your study material, ready in your library.
+            Your ExamByte PDFs are ready for secure download.
           </p>
         </div>
 
@@ -113,12 +92,6 @@ export default function TestDownloads({ payment }) {
           {subjectIds.length} {subjectIds.length === 1 ? "subject" : "subjects"}
         </span>
       </div>
-
-      {!isLivePurchase && (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-          Test Mode is active. Downloads are sample files, not the full PDFs.
-        </p>
-      )}
 
       {subjectIds.length > 0 ? (
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -130,12 +103,12 @@ export default function TestDownloads({ payment }) {
             return (
               <article
                 key={subjectId}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:hover:border-amber-700">
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800">
                 <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-amber-100 to-orange-50 dark:from-slate-700 dark:to-slate-800">
                   {image && !imageFailed ? (
                     <img
                       src={image}
-                      alt={`${title} study notes`}
+                      alt={`${title} study material`}
                       loading="lazy"
                       onError={() =>
                         setFailedImages((current) =>
@@ -152,7 +125,7 @@ export default function TestDownloads({ payment }) {
                     </div>
                   )}
 
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-emerald-300">
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
                     <Check size={14} />
                     Owned
                   </span>
@@ -173,7 +146,9 @@ export default function TestDownloads({ payment }) {
                     onClick={() => downloadFile(subjectId)}
                     className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60 dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300">
                     <Download size={17} />
-                    {busyId === subjectId ? "Preparing download…" : "Download"}
+                    {busyId === subjectId
+                      ? "Preparing download…"
+                      : "Download PDF"}
                   </button>
                 </div>
               </article>

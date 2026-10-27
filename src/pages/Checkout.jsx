@@ -7,13 +7,13 @@ import {
   FileText,
   Mail,
   Phone,
+  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { authFetch } from "../lib/authFetch";
 import { useAuth } from "../lib/AuthContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import TestDownloads from "../components/TestDownloads";
 
 function readPendingPurchase() {
   try {
@@ -25,18 +25,22 @@ function readPendingPurchase() {
 }
 
 const inputClass =
-  "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-amber-400 dark:focus:ring-amber-950";
+  "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
 
-function loadRazorpay() {
-  if (window.Razorpay) return Promise.resolve();
+function loadCashfree() {
+  if (typeof window.Cashfree === "function") {
+    return Promise.resolve();
+  }
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
     script.onload = () => resolve();
     script.onerror = () =>
       reject(
-        new Error("Could not load Razorpay Checkout. Check your connection."),
+        new Error(
+          "Could not load secure checkout. Please check your connection and try again.",
+        ),
       );
 
     document.body.appendChild(script);
@@ -50,9 +54,16 @@ async function postJson(url, body) {
     body: JSON.stringify(body),
   });
 
-  const data = await response.json();
+  const text = await response.text();
+  let data = {};
 
-  if (!response.ok && response.status !== 202) {
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
     throw new Error(data.error || "Something went wrong. Please try again.");
   }
 
@@ -75,10 +86,10 @@ export default function Checkout() {
     }
   });
 
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [verifiedPayment, setVerifiedPayment] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const selectedSubjects =
     Array.isArray(purchase?.subjects) && purchase.subjects.length
@@ -123,12 +134,17 @@ export default function Checkout() {
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Please enter a valid email address for your PDF.");
+      setError("Please enter a valid email address.");
       return;
     }
 
     if (!/^\d{10}$/.test(mobile)) {
-      setError("Please enter a 10-digit mobile or WhatsApp number.");
+      setError("Please enter a valid 10-digit Indian mobile number.");
+      return;
+    }
+
+    if (!acceptedPolicy) {
+      setError("Please accept the Terms and Refund Policy to continue.");
       return;
     }
 
@@ -137,14 +153,14 @@ export default function Checkout() {
       return;
     }
 
-    setBusy(true);
+    const cleanCustomer = { fullName, email, mobile };
 
     if (!user) {
       sessionStorage.setItem(
         "examByteCheckoutDraft",
         JSON.stringify({
           purchase,
-          customer: { fullName, email, mobile },
+          customer: cleanCustomer,
         }),
       );
 
@@ -152,32 +168,25 @@ export default function Checkout() {
       return;
     }
 
-    if (user.email_confirmed_at && user.email.toLowerCase() !== email) {
+    if (user.email && user.email.toLowerCase() !== email) {
       setError(
-        `You're signed in as ${user.email}. Use that email here, or log out and sign in with the other email before buying.`,
+        `You are signed in as ${user.email}. Please use that same email for this order.`,
       );
-      setBusy(false);
       return;
     }
 
-    try {
-      const cleanCustomer = {
-        fullName,
-        email,
-        mobile,
-      };
+    setBusy(true);
 
-      const order = await postJson("/api/orders", {
+    try {
+      const order = await postJson("/api/create-order", {
         type: purchase.type,
         subjectIds: purchase.subjectIds,
         customer: cleanCustomer,
       });
 
-      if (!order.keyId?.startsWith("rzp_test_")) {
-        throw new Error("Only Test Mode payments are enabled.");
+      if (!order.paymentSessionId) {
+        throw new Error("Could not start secure checkout. Please try again.");
       }
-
-      await loadRazorpay();
 
       sessionStorage.setItem(
         "examByteCheckoutDraft",
@@ -188,69 +197,22 @@ export default function Checkout() {
         }),
       );
 
-      setCustomer(cleanCustomer);
+      await loadCashfree();
 
-      const checkout = new window.Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: "ExamByte",
-        description: order.title,
-        order_id: order.orderId,
-
-        prefill: {
-          name: fullName,
-          email,
-          contact: `+91${mobile}`,
-        },
-
-        theme: {
-          color: "#eab308",
-        },
-
-        handler: async (payment) => {
-          setBusy(true);
-
-          try {
-            const result = await postJson("/api/verify", payment);
-
-            if (result.verified) {
-              setVerifiedPayment(result);
-              setNotice("");
-            } else {
-              setNotice(
-                result.message ||
-                  "Payment is awaiting capture. Please check again later.",
-              );
-            }
-          } catch (verificationError) {
-            setError(verificationError.message);
-          } finally {
-            setBusy(false);
-          }
-        },
-
-        modal: {
-          ondismiss: () => setBusy(false),
-        },
+      const cashfree = window.Cashfree({
+        mode: "production",
       });
 
-      checkout.on("payment.failed", (failure) => {
-        setError(
-          failure.error?.description ||
-            "Test payment failed. Please try again.",
-        );
-        setBusy(false);
+      cashfree.checkout({
+        paymentSessionId: order.paymentSessionId,
+        redirectTarget: "_self",
       });
-
-      checkout.open();
     } catch (paymentError) {
       setError(
-        paymentError instanceof TypeError
-          ? "Cannot reach the payment server. Start it and check the Vite proxy."
-          : paymentError.message,
+        paymentError instanceof Error
+          ? paymentError.message
+          : "Could not start payment. Please try again.",
       );
-
       setBusy(false);
     }
   }
@@ -263,12 +225,12 @@ export default function Checkout() {
         <div className="mx-auto max-w-2xl">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-yellow-700 dark:text-slate-300 dark:hover:text-amber-300">
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-yellow-700 dark:text-slate-300">
             <ArrowLeft size={17} />
             Back to PDFs
           </Link>
 
-          <div className="mt-6 overflow-hidden rounded-[2rem] border border-white bg-white shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
+          <div className="mt-6 overflow-hidden rounded-[2rem] border border-white bg-white shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 bg-slate-950 px-6 py-7 text-white dark:border-slate-800 sm:px-8">
               <p className="text-xs font-bold uppercase tracking-[.2em] text-amber-300">
                 ExamByte checkout
@@ -279,37 +241,33 @@ export default function Checkout() {
               </h1>
 
               <p className="mt-2 text-sm text-slate-300">
-                Enter your details before opening Razorpay Test Mode.
+                Complete payment securely through Cashfree.
               </p>
 
-              <span className="mt-3 inline-block rounded-full bg-amber-300 px-3 py-1 text-xs font-extrabold text-slate-950">
-                TEST MODE · No real charge
+              <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-3 py-1 text-xs font-extrabold text-slate-950">
+                <ShieldCheck size={14} />
+                Secure payment
               </span>
             </div>
 
             {!purchase ? (
               <div className="px-6 py-12 text-center sm:px-8">
                 <FileText size={36} className="mx-auto text-slate-400" />
-
                 <h2 className="mt-4 text-xl font-bold">No PDFs selected</h2>
-
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                <p className="mt-2 text-sm text-slate-600">
                   Choose a subject or bundle to begin.
                 </p>
-
                 <Link
                   to="/"
-                  className="mt-6 inline-flex rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-white dark:bg-amber-400 dark:text-slate-950">
+                  className="mt-6 inline-flex rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-white">
                   Browse PDFs
                 </Link>
               </div>
             ) : (
               <>
-                <section
-                  className="px-6 pt-7 sm:px-8"
-                  aria-label="Order summary">
+                <section className="px-6 pt-7 sm:px-8">
                   <div className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/80">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-yellow-100 to-blue-100 dark:from-slate-700 dark:to-slate-800">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-yellow-100 to-blue-100">
                       {purchase.image ? (
                         <img
                           src={purchase.image}
@@ -317,40 +275,35 @@ export default function Checkout() {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <FileText
-                          size={28}
-                          className="text-yellow-700 dark:text-amber-300"
-                        />
+                        <FileText size={28} className="text-yellow-700" />
                       )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold uppercase tracking-wider text-yellow-700 dark:text-amber-300">
+                      <p className="text-xs font-bold uppercase tracking-wider text-yellow-700">
                         {purchase.type === "bundle"
                           ? "PDF bundle"
-                          : "PDF notes"}
+                          : "Revision PDF"}
                       </p>
 
-                      <h2 className="mt-1 text-lg font-extrabold dark:text-white">
+                      <h2 className="mt-1 text-lg font-extrabold">
                         {purchase.title}
                       </h2>
 
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                      <p className="mt-1 text-sm text-slate-500">
                         {selectedSubjects.length}{" "}
                         {selectedSubjects.length === 1 ? "PDF" : "PDFs"}{" "}
                         selected
                       </p>
                     </div>
 
-                    <span className="shrink-0 text-xl font-extrabold text-slate-900 dark:text-white">
+                    <span className="shrink-0 text-xl font-extrabold">
                       {purchase.price}
                     </span>
                   </div>
 
                   <div className="mt-5 rounded-2xl border border-slate-100 p-4 dark:border-slate-700">
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">
-                      Included in your order
-                    </p>
+                    <p className="text-sm font-bold">Included in your order</p>
 
                     <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                       {selectedSubjects.map((subject) => (
@@ -359,7 +312,7 @@ export default function Checkout() {
                           className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                           <CheckCircle2
                             size={16}
-                            className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                            className="mt-0.5 shrink-0 text-emerald-600"
                           />
                           {subject}
                         </li>
@@ -368,147 +321,140 @@ export default function Checkout() {
                   </div>
                 </section>
 
-                {verifiedPayment ? (
-                  <section className="px-6 py-8 sm:px-8" aria-live="polite">
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-700/40 dark:bg-emerald-400/10">
-                      <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                        Test payment verified
-                      </h2>
-
-                      <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
-                        Razorpay confirmed this simulated payment as captured.
-                        You can test the selected-subject download buttons
-                        below.
-                      </p>
-
-                      <p className="mt-3 break-all text-xs text-slate-600 dark:text-slate-300">
-                        Payment ID: {verifiedPayment.paymentId}
-                      </p>
-                    </div>
-
-                    <TestDownloads payment={verifiedPayment} />
-
-                    <Link
-                      to="/my-purchases"
-                      className="mt-5 inline-flex rounded-xl bg-amber-400 px-5 py-3 font-bold text-slate-950 hover:bg-amber-300">
-                      Open My Study Notes
-                    </Link>
-                  </section>
-                ) : (
-                  <form
-                    onSubmit={startPayment}
-                    className="space-y-5 px-6 py-8 sm:px-8">
-                    <div>
-                      <h2 className="text-xl font-extrabold">Your details</h2>
-
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        All three fields are required.
-                      </p>
-                    </div>
-
-                    <label
-                      className="block text-sm font-semibold"
-                      htmlFor="buyer-name">
-                      <span className="inline-flex items-center gap-2">
-                        <UserRound size={17} />
-                        Full name
-                      </span>
-
-                      <input
-                        id="buyer-name"
-                        name="fullName"
-                        autoComplete="name"
-                        required
-                        value={customer.fullName}
-                        onChange={updateCustomer}
-                        placeholder="Your full name"
-                        className={inputClass}
-                      />
-                    </label>
-
-                    <label
-                      className="block text-sm font-semibold"
-                      htmlFor="buyer-email">
-                      <span className="inline-flex items-center gap-2">
-                        <Mail size={17} />
-                        Email address
-                      </span>
-
-                      <input
-                        id="buyer-email"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        value={customer.email}
-                        onChange={updateCustomer}
-                        placeholder="you@example.com"
-                        className={inputClass}
-                      />
-
-                      <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
-                        Enter the email where you want your PDFs once delivery
-                        is enabled.
-                      </span>
-                    </label>
-
-                    <label
-                      className="block text-sm font-semibold"
-                      htmlFor="buyer-mobile">
-                      <span className="inline-flex items-center gap-2">
-                        <Phone size={17} />
-                        Mobile / WhatsApp number
-                      </span>
-
-                      <input
-                        id="buyer-mobile"
-                        name="mobile"
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        required
-                        value={customer.mobile}
-                        onChange={updateCustomer}
-                        placeholder="10-digit mobile number"
-                        className={inputClass}
-                      />
-                    </label>
-
-                    {error && (
-                      <p
-                        role="alert"
-                        className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-200">
-                        {error}
-                      </p>
-                    )}
-
-                    {notice && (
-                      <p
-                        role="status"
-                        className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                        {notice}
-                      </p>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={busy || authLoading}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-4 font-bold text-white shadow-md shadow-yellow-200 transition hover:bg-yellow-600 disabled:cursor-wait disabled:opacity-60 dark:bg-amber-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-amber-300">
-                      {authLoading
-                        ? "Checking your login…"
-                        : busy
-                          ? "Preparing test payment…"
-                          : `Continue to test payment · ${purchase.price}`}
-
-                      <ArrowRight size={18} />
-                    </button>
-
-                    <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-                      The server calculates the final amount. Test payments use
-                      simulated money.
+                <form
+                  onSubmit={startPayment}
+                  className="space-y-5 px-6 py-8 sm:px-8">
+                  <div>
+                    <h2 className="text-xl font-extrabold">Your details</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Your order will stay linked to your ExamByte account.
                     </p>
-                  </form>
-                )}
+                  </div>
+
+                  <label
+                    className="block text-sm font-semibold"
+                    htmlFor="buyer-name">
+                    <span className="inline-flex items-center gap-2">
+                      <UserRound size={17} />
+                      Full name
+                    </span>
+
+                    <input
+                      id="buyer-name"
+                      name="fullName"
+                      autoComplete="name"
+                      required
+                      value={customer.fullName}
+                      onChange={updateCustomer}
+                      placeholder="Your full name"
+                      className={inputClass}
+                    />
+                  </label>
+
+                  <label
+                    className="block text-sm font-semibold"
+                    htmlFor="buyer-email">
+                    <span className="inline-flex items-center gap-2">
+                      <Mail size={17} />
+                      Email address
+                    </span>
+
+                    <input
+                      id="buyer-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={customer.email}
+                      onChange={updateCustomer}
+                      placeholder="you@example.com"
+                      className={inputClass}
+                    />
+                  </label>
+
+                  <label
+                    className="block text-sm font-semibold"
+                    htmlFor="buyer-mobile">
+                    <span className="inline-flex items-center gap-2">
+                      <Phone size={17} />
+                      Mobile number
+                    </span>
+
+                    <input
+                      id="buyer-mobile"
+                      name="mobile"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                      value={customer.mobile}
+                      onChange={updateCustomer}
+                      placeholder="10-digit Indian mobile number"
+                      className={inputClass}
+                    />
+                  </label>
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={acceptedPolicy}
+                      onChange={(event) =>
+                        setAcceptedPolicy(event.target.checked)
+                      }
+                      className="mt-1 h-4 w-4 accent-amber-500"
+                    />
+
+                    <span>
+                      I agree to the{" "}
+                      <Link
+                        to="/terms"
+                        className="font-bold text-yellow-700 underline">
+                        Terms & Conditions
+                      </Link>{" "}
+                      and{" "}
+                      <Link
+                        to="/refund-policy"
+                        className="font-bold text-yellow-700 underline">
+                        Refunds & Cancellations Policy
+                      </Link>
+                      .
+                    </span>
+                  </label>
+
+                  {error && (
+                    <p
+                      role="alert"
+                      className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                      {error}
+                    </p>
+                  )}
+
+                  {notice && (
+                    <p
+                      role="status"
+                      className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                      {notice}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={busy || authLoading}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-4 font-bold text-white shadow-md shadow-yellow-200 transition hover:bg-yellow-600 disabled:cursor-wait disabled:opacity-60">
+                    {authLoading
+                      ? "Checking your login…"
+                      : busy
+                        ? "Opening secure payment…"
+                        : `Continue to secure payment · ${purchase.price}`}
+
+                    <ArrowRight size={18} />
+                  </button>
+
+                  <p className="text-center text-xs leading-5 text-slate-500">
+                    Digital PDF · No physical shipping · Payment is processed
+                    securely by Cashfree.
+                  </p>
+                </form>
               </>
             )}
           </div>
