@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LogIn, LogOut, Menu, Moon, Sun, UserPlus, X } from "lucide-react";
+import { LogOut, Menu, Moon, Sun, UserRound, X } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -32,7 +32,6 @@ export default function Header() {
     : "/my-purchases";
 
   const loginHref = `/login?returnTo=${encodeURIComponent(returnTo)}`;
-  const registerHref = `/register?returnTo=${encodeURIComponent(returnTo)}`;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -109,21 +108,12 @@ export default function Header() {
                 </button>
               </>
             ) : (
-              <>
-                <Link
-                  to={loginHref}
-                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
-                  <LogIn size={16} />
-                  Login
-                </Link>
-
-                <Link
-                  to={registerHref}
-                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300">
-                  <UserPlus size={16} />
-                  Register
-                </Link>
-              </>
+              <Link
+                to={loginHref}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300">
+                <UserRound size={16} />
+                Sign in / Create account
+              </Link>
             ))}
         </div>
 
@@ -184,15 +174,9 @@ export default function Header() {
                   <Link
                     to={loginHref}
                     onClick={() => setMenuOpen(false)}
-                    className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
-                    Login
-                  </Link>
-
-                  <Link
-                    to={registerHref}
-                    onClick={() => setMenuOpen(false)}
-                    className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white dark:bg-amber-400 dark:text-slate-950">
-                    Register
+                    className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white dark:bg-amber-400 dark:text-slate-950">
+                    <UserRound size={16} />
+                    Sign in / Create account
                   </Link>
                 </div>
               ))}

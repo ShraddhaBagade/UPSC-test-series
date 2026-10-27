@@ -31,7 +31,7 @@ export default function AccountNav() {
         </>
       ) : (
         <Link to="/login" className="hover:text-amber-700">
-          Log in / Sign up
+          Sign in / Create account
         </Link>
       )}
     </nav>

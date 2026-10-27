@@ -123,7 +123,7 @@ export default function Login() {
           <p className="mt-3 text-center text-sm leading-6 text-slate-600 dark:text-slate-300">
             {codeSent
               ? `Enter the code sent to ${email}.`
-              : "Use the same email address you entered during checkout to access your purchased PDFs."}
+              : "Create an ExamByte account or sign in to an existing account. If you have purchased PDFs, use the same email entered during checkout."}
           </p>
 
           {!codeSent ? (
@@ -146,11 +146,12 @@ export default function Login() {
               </label>
 
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-                <p className="font-bold">New or returning buyer?</p>
+                <p className="font-bold">New or returning user?</p>
                 <p className="mt-1">
-                  Use this one secure email-code flow. A new email creates your
+                  Use one secure email-code flow. A new email creates your
                   ExamByte account after verification; an existing email signs
-                  you in to your library.
+                  you in. Your library stays empty until you complete a verified
+                  purchase.
                 </p>
               </div>
 
