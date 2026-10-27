@@ -451,7 +451,7 @@ export default function LandingPage() {
               </div>
 
               <a
-                href="#bundles"
+                href="/#bundles"
                 className="inline-flex items-center gap-2 font-semibold text-yellow-700 hover:text-yellow-800 dark:text-amber-300 dark:hover:text-amber-200">
                 Prefer a bundle?
                 <ArrowRight size={18} />

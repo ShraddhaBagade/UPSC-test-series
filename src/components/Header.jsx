@@ -6,8 +6,8 @@ import { supabase } from "../lib/supabase";
 
 const navigation = [
   { label: "Study Material", href: "/#study-material" },
-  { label: "Bundles", href: "#bundles" },
-  { label: "Contact", href: "#contact" },
+  { label: "Bundles", href: "/#bundles" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 const allowedDestinations = ["/checkout", "/my-purchases"];
