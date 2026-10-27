@@ -43,8 +43,12 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { received: true, ignored: true });
     }
 
+    /*
+      Do not trust the browser or webhook payload alone.
+      Ask Cashfree directly whether the exact order was paid successfully.
+    */
     const paymentResponse = await cashfreeRequest(
-      `/pg/orders/${encodeURIComponent(cashfreeOrderId)}/payments`,
+      `/orders/${encodeURIComponent(cashfreeOrderId)}/payments`,
       { method: "GET" },
     );
 
@@ -86,13 +90,16 @@ export default async function handler(req, res) {
       ? order.subject_ids
       : [];
 
-    const subjects = Array.isArray(order.subjects)
-      ? order.subjects
-      : [];
+    const subjects = Array.isArray(order.subjects) ? order.subjects : [];
 
+    /*
+      For a guest purchase, user_id is null for now.
+      It will be attached to the real account only after that email
+      completes its OTP sign-in.
+    */
     const purchaseItems = subjectIds.map((subjectId, index) => ({
       order_id: order.id,
-      user_id: order.user_id,
+      user_id: order.user_id || null,
       subject_id: subjectId,
       subject_title: subjects[index] || subjectId,
     }));

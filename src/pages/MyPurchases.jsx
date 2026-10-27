@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -75,7 +75,55 @@ export default function MyPurchases() {
   }
 
   if (!user) {
-    return <Navigate to="/login?returnTo=/my-purchases" replace />;
+    return (
+      <div className="flex min-h-screen flex-col bg-[#f7f8fc] text-slate-900 dark:bg-slate-950 dark:text-white">
+        <Header />
+
+        <main className="flex flex-1 items-center px-4 py-12 sm:px-6">
+          <section className="mx-auto w-full max-w-xl rounded-[2rem] border border-amber-100 bg-white p-7 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-10">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              <ShieldCheck size={31} />
+            </div>
+
+            <p className="mt-6 text-xs font-bold uppercase tracking-[.18em] text-amber-700 dark:text-amber-300">
+              Secure buyer access
+            </p>
+
+            <h1 className="mt-3 text-2xl font-extrabold sm:text-3xl">
+              Access your purchased PDFs
+            </h1>
+
+            <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Sign in using the same email address you entered during checkout.
+              We will send a one-time verification code to that email, then your
+              verified PDFs will appear in your Study Library.
+            </p>
+
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-sm leading-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+              <p className="font-bold">Use your checkout email</p>
+              <p className="mt-1">
+                If you entered an incorrect or inaccessible email during
+                payment, we cannot safely give the purchase to another account.
+              </p>
+            </div>
+
+            <Link
+              to="/login?returnTo=/my-purchases"
+              className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-amber-400 px-5 py-3.5 font-extrabold text-slate-950 transition hover:bg-amber-300">
+              Sign in to my study library
+            </Link>
+
+            <Link
+              to="/"
+              className="mt-5 inline-flex text-sm font-bold text-slate-600 hover:text-amber-700 dark:text-slate-300 dark:hover:text-amber-300">
+              Browse study material
+            </Link>
+          </section>
+        </main>
+
+        <Footer />
+      </div>
+    );
   }
 
   const subjectCount = purchases.reduce(

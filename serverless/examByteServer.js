@@ -39,9 +39,7 @@ export class HttpError extends Error {
 }
 
 export function sendJson(res, status, body) {
-  res.status(status).setHeader("Content-Type", "application/json");
-  res.setHeader("Cache-Control", "no-store");
-  res.end(JSON.stringify(body));
+  res.status(status).json(body);
 }
 
 export function requireMethod(req, method) {
@@ -61,32 +59,59 @@ export function getEnv(name) {
 }
 
 export function getSupabaseAdmin() {
-  return createClient(
-    getEnv("SUPABASE_URL"),
-    getEnv("SUPABASE_SECRET_KEY"),
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+  return createClient(getEnv("SUPABASE_URL"), getEnv("SUPABASE_SECRET_KEY"), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+  });
+}
+
+function getBearerToken(req) {
+  const authorization = req.headers.authorization || "";
+
+  if (!authorization.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authorization.slice("Bearer ".length).trim();
+  return token || null;
 }
 
 export async function requireUser(req) {
-  const authorization = req.headers.authorization || "";
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const token = getBearerToken(req);
 
-  if (!match) {
-    throw new HttpError(401, "Please log in again.");
+  if (!token) {
+    throw new HttpError(401, "Please sign in to access your study library.");
   }
 
   const supabase = getSupabaseAdmin();
-
-  const { data, error } = await supabase.auth.getUser(match[1]);
+  const { data, error } = await supabase.auth.getUser(token);
 
   if (error || !data.user) {
-    throw new HttpError(401, "Your login session has expired. Please log in again.");
+    throw new HttpError(401, "Your session has expired. Please sign in again.");
+  }
+
+  return data.user;
+}
+
+/*
+  Guest checkout is allowed.
+  If a valid logged-in session exists, return that user.
+  If no session exists, return null.
+*/
+export async function getOptionalUser(req) {
+  const token = getBearerToken(req);
+
+  if (!token) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data.user) {
+    return null;
   }
 
   return data.user;
@@ -115,15 +140,21 @@ export function priceSelection(type, subjectIds) {
   }
 
   if (type === "bundle" && !bundlePrices.has(subjectIds.length)) {
-    throw new HttpError(400, "Choose exactly 3, 5, or all 9 subjects.");
+    throw new HttpError(
+      400,
+      "Choose exactly 3, 5, or all 9 subjects for a bundle.",
+    );
   }
 
   if (type !== "pdf" && type !== "bundle") {
     throw new HttpError(400, "Unknown purchase type.");
   }
 
+  const amountPaise =
+    type === "pdf" ? 9900 : bundlePrices.get(subjectIds.length);
+
   return {
-    amountPaise: type === "pdf" ? 9900 : bundlePrices.get(subjectIds.length),
+    amountPaise,
     title:
       type === "pdf"
         ? subjects.get(subjectIds[0])
@@ -145,102 +176,110 @@ export function validateCustomer(customer) {
       : "";
 
   const mobile =
-    typeof customer?.mobile === "string"
-      ? customer.mobile.replace(/\D/g, "")
-      : "";
-
-  const indianMobile =
-    mobile.length === 12 && mobile.startsWith("91")
-      ? mobile.slice(2)
-      : mobile;
+    typeof customer?.mobile === "string" ? customer.mobile.trim() : "";
 
   if (
     fullName.length < 2 ||
     fullName.length > 100 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
     email.length > 254 ||
-    !/^[0-9]{10}$/.test(indianMobile)
+    !/^[0-9]{10}$/.test(mobile)
   ) {
     throw new HttpError(
       400,
-      "Enter your name, a valid email, and a 10-digit mobile number.",
+      "Enter your full name, a valid email, and a 10-digit mobile number.",
     );
   }
 
-  return { fullName, email, mobile: indianMobile };
+  return { fullName, email, mobile };
 }
 
 export function createCashfreeOrderId() {
-  return `exb_${randomUUID().replaceAll("-", "").slice(0, 28)}`;
+  return `exb_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
 
 function cashfreeBaseUrl() {
-  return getEnv("CASHFREE_ENVIRONMENT") === "production"
-    ? "https://api.cashfree.com"
-    : "https://sandbox.cashfree.com";
+  const environment = getEnv("CASHFREE_ENVIRONMENT").toLowerCase();
+
+  if (environment === "production") {
+    return "https://api.cashfree.com/pg";
+  }
+
+  if (environment === "sandbox" || environment === "test") {
+    return "https://sandbox.cashfree.com/pg";
+  }
+
+  throw new HttpError(
+    503,
+    "CASHFREE_ENVIRONMENT must be production or sandbox.",
+  );
 }
 
 export async function cashfreeRequest(path, options = {}) {
   const response = await fetch(`${cashfreeBaseUrl()}${path}`, {
     ...options,
     headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "x-api-version": "2023-08-01",
       "x-client-id": getEnv("CASHFREE_CLIENT_ID"),
       "x-client-secret": getEnv("CASHFREE_CLIENT_SECRET"),
+      "x-api-version": "2023-08-01",
+      "Content-Type": "application/json",
       ...(options.headers || {}),
     },
+    signal: AbortSignal.timeout(15_000),
   });
 
-  const text = await response.text();
-  let data = null;
+  const responseText = await response.text();
+  let responseBody = null;
 
   try {
-    data = text ? JSON.parse(text) : null;
+    responseBody = responseText ? JSON.parse(responseText) : null;
   } catch {
-    data = null;
+    responseBody = null;
   }
 
   if (!response.ok) {
-    console.error("Cashfree API error:", response.status, data || text);
-
+    console.error("Cashfree API error:", response.status, responseBody);
     throw new HttpError(
       502,
-      "Could not start Cashfree checkout. Please try again shortly.",
+      "Cashfree could not process the request. Please try again.",
     );
   }
 
-  return data;
-}
-
-export function getPdfFilename(subjectId) {
-  const filename = pdfFiles.get(subjectId);
-
-  if (!filename) {
-    throw new HttpError(400, "Unknown purchased PDF.");
-  }
-
-  return filename;
+  return responseBody;
 }
 
 export async function readRawBody(req) {
-  const chunks = [];
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
 
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
+    req.on("data", (chunk) => {
+      size += chunk.length;
 
-  return Buffer.concat(chunks).toString("utf8");
+      if (size > 64 * 1024) {
+        reject(new HttpError(413, "Webhook request is too large."));
+        req.destroy();
+        return;
+      }
+
+      chunks.push(chunk);
+    });
+
+    req.on("end", () => {
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+
+    req.on("error", reject);
+  });
 }
 
 export function verifyCashfreeWebhook(req, rawBody) {
-  const signature = req.headers["x-webhook-signature"];
   const timestamp = req.headers["x-webhook-timestamp"];
+  const signature = req.headers["x-webhook-signature"];
 
   if (
-    typeof signature !== "string" ||
     typeof timestamp !== "string" ||
+    typeof signature !== "string" ||
     !rawBody
   ) {
     return false;
@@ -253,8 +292,19 @@ export function verifyCashfreeWebhook(req, rawBody) {
   const expectedBuffer = Buffer.from(expected);
   const receivedBuffer = Buffer.from(signature);
 
-  return (
-    expectedBuffer.length === receivedBuffer.length &&
-    timingSafeEqual(expectedBuffer, receivedBuffer)
-  );
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+export function getPdfFilename(subjectId) {
+  const filename = pdfFiles.get(subjectId);
+
+  if (!filename) {
+    throw new HttpError(400, "Unknown PDF subject.");
+  }
+
+  return filename;
 }

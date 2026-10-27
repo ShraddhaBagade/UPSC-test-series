@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -47,12 +47,20 @@ function loadCashfree() {
   });
 }
 
-async function postJson(url, body) {
-  const response = await authFetch(url, {
+/*
+  Guests use normal fetch.
+  Signed-in buyers send their Supabase access token with the request.
+*/
+async function postJson(url, body, signedIn) {
+  const request = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  };
+
+  const response = signedIn
+    ? await authFetch(url, request)
+    : await fetch(url, request);
 
   const text = await response.text();
   let data = {};
@@ -71,8 +79,7 @@ async function postJson(url, body) {
 }
 
 export default function Checkout() {
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [purchase] = useState(readPendingPurchase);
 
   const [customer, setCustomer] = useState(() => {
@@ -98,6 +105,46 @@ export default function Checkout() {
         ? [purchase.title]
         : [];
 
+  /*
+    A logged-in buyer gets their previously saved checkout details.
+    If the profile does not exist yet, their account email is still filled in.
+  */
+  useEffect(() => {
+    if (!user?.email) return;
+
+    let cancelled = false;
+
+    async function loadSavedDetails() {
+      try {
+        const response = await authFetch("/api/my-profile");
+        const result = await response.json();
+
+        if (!response.ok || cancelled) return;
+
+        const profile = result.profile;
+
+        setCustomer((current) => ({
+          fullName: profile?.fullName || current.fullName,
+          email: user.email.trim().toLowerCase(),
+          mobile: profile?.mobile || current.mobile,
+        }));
+      } catch {
+        if (!cancelled) {
+          setCustomer((current) => ({
+            ...current,
+            email: user.email.trim().toLowerCase(),
+          }));
+        }
+      }
+    }
+
+    loadSavedDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.email]);
+
   function updateCustomer(event) {
     const { name, value } = event.target;
 
@@ -113,11 +160,6 @@ export default function Checkout() {
     event.preventDefault();
     setError("");
     setNotice("");
-
-    if (authLoading) {
-      setNotice("Checking your login. Please wait a moment.");
-      return;
-    }
 
     const fullName = customer.fullName.trim();
     const email = customer.email.trim().toLowerCase();
@@ -153,36 +195,27 @@ export default function Checkout() {
       return;
     }
 
-    const cleanCustomer = { fullName, email, mobile };
-
-    if (!user) {
-      sessionStorage.setItem(
-        "examByteCheckoutDraft",
-        JSON.stringify({
-          purchase,
-          customer: cleanCustomer,
-        }),
-      );
-
-      navigate("/login?returnTo=/checkout");
-      return;
-    }
-
-    if (user.email && user.email.toLowerCase() !== email) {
+    if (user?.email && user.email.trim().toLowerCase() !== email) {
       setError(
         `You are signed in as ${user.email}. Please use that same email for this order.`,
       );
       return;
     }
 
+    const cleanCustomer = { fullName, email, mobile };
+
     setBusy(true);
 
     try {
-      const order = await postJson("/api/create-order", {
-        type: purchase.type,
-        subjectIds: purchase.subjectIds,
-        customer: cleanCustomer,
-      });
+      const order = await postJson(
+        "/api/create-order",
+        {
+          type: purchase.type,
+          subjectIds: purchase.subjectIds,
+          customer: cleanCustomer,
+        },
+        Boolean(user),
+      );
 
       if (!order.paymentSessionId) {
         throw new Error("Could not start secure checkout. Please try again.");
@@ -325,9 +358,14 @@ export default function Checkout() {
                   onSubmit={startPayment}
                   className="space-y-5 px-6 py-8 sm:px-8">
                   <div>
-                    <h2 className="text-xl font-extrabold">Your details</h2>
+                    <h2 className="text-xl font-extrabold">
+                      Your delivery details
+                    </h2>
+
                     <p className="mt-1 text-sm text-slate-500">
-                      Your order will stay linked to your ExamByte account.
+                      {user
+                        ? "Your saved details are used for this purchase."
+                        : "No account is required before payment."}
                     </p>
                   </div>
 
@@ -365,11 +403,28 @@ export default function Checkout() {
                       type="email"
                       autoComplete="email"
                       required
+                      readOnly={Boolean(user)}
                       value={customer.email}
                       onChange={updateCustomer}
                       placeholder="you@example.com"
-                      className={inputClass}
+                      className={`${inputClass} ${
+                        user
+                          ? "cursor-not-allowed bg-slate-100 dark:bg-slate-700"
+                          : ""
+                      }`}
                     />
+
+                    {user ? (
+                      <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                        Signed in as {user.email}. This purchase will be added
+                        to your existing library.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Use an email address you can access. You will use an OTP
+                        sent to this email to open your PDF library later.
+                      </p>
+                    )}
                   </label>
 
                   <label
@@ -393,6 +448,18 @@ export default function Checkout() {
                       className={inputClass}
                     />
                   </label>
+
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                    <p className="font-bold">
+                      Important: enter correct details
+                    </p>
+                    <p className="mt-1 leading-6">
+                      Your purchase and secure PDF library are linked to this
+                      email address. You must be able to receive an OTP at this
+                      email to access your PDFs later. Please enter your own
+                      correct mobile number and email address.
+                    </p>
+                  </div>
 
                   <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     <input
@@ -439,13 +506,11 @@ export default function Checkout() {
 
                   <button
                     type="submit"
-                    disabled={busy || authLoading}
+                    disabled={busy}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-4 font-bold text-white shadow-md shadow-yellow-200 transition hover:bg-yellow-600 disabled:cursor-wait disabled:opacity-60">
-                    {authLoading
-                      ? "Checking your login…"
-                      : busy
-                        ? "Opening secure payment…"
-                        : `Continue to secure payment · ${purchase.price}`}
+                    {busy
+                      ? "Opening secure payment…"
+                      : `Continue to secure payment · ${purchase.price}`}
 
                     <ArrowRight size={18} />
                   </button>
