@@ -34,6 +34,7 @@ function loadCashfree() {
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
+
     script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
     script.onload = () => resolve();
     script.onerror = () =>
@@ -47,14 +48,12 @@ function loadCashfree() {
   });
 }
 
-/*
-  Guests use normal fetch.
-  Signed-in buyers send their Supabase access token with the request.
-*/
 async function postJson(url, body, signedIn) {
   const request = {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   };
 
@@ -72,6 +71,16 @@ async function postJson(url, body, signedIn) {
   }
 
   if (!response.ok) {
+    const isLocalWebsite =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    if (isLocalWebsite) {
+      throw new Error(
+        "Secure payments cannot run from localhost. Please open exambyte.co.in to continue with Cashfree payment.",
+      );
+    }
+
     throw new Error(data.error || "Something went wrong. Please try again.");
   }
 
@@ -86,16 +95,23 @@ export default function Checkout() {
     try {
       return (
         JSON.parse(sessionStorage.getItem("examByteCheckoutDraft"))
-          ?.customer || { fullName: "", email: "", mobile: "" }
+          ?.customer || {
+          fullName: "",
+          email: "",
+          mobile: "",
+        }
       );
     } catch {
-      return { fullName: "", email: "", mobile: "" };
+      return {
+        fullName: "",
+        email: "",
+        mobile: "",
+      };
     }
   });
 
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
   const selectedSubjects =
@@ -106,8 +122,8 @@ export default function Checkout() {
         : [];
 
   /*
-    A logged-in buyer gets their previously saved checkout details.
-    If the profile does not exist yet, their account email is still filled in.
+    Logged-in buyers get their saved checkout details.
+    Guests fill the form normally.
   */
   useEffect(() => {
     if (!user?.email) return;
@@ -153,16 +169,18 @@ export default function Checkout() {
       [name]: value,
     }));
 
-    if (error) setError("");
+    if (error) {
+      setError("");
+    }
   }
 
   async function startPayment(event) {
     event.preventDefault();
     setError("");
-    setNotice("");
 
     const fullName = customer.fullName.trim();
     const email = customer.email.trim().toLowerCase();
+
     const digits = customer.mobile.replace(/\D/g, "");
 
     const mobile =
@@ -202,7 +220,11 @@ export default function Checkout() {
       return;
     }
 
-    const cleanCustomer = { fullName, email, mobile };
+    const cleanCustomer = {
+      fullName,
+      email,
+      mobile,
+    };
 
     setBusy(true);
 
@@ -246,6 +268,7 @@ export default function Checkout() {
           ? paymentError.message
           : "Could not start payment. Please try again.",
       );
+
       setBusy(false);
     }
   }
@@ -286,10 +309,13 @@ export default function Checkout() {
             {!purchase ? (
               <div className="px-6 py-12 text-center sm:px-8">
                 <FileText size={36} className="mx-auto text-slate-400" />
+
                 <h2 className="mt-4 text-xl font-bold">No PDFs selected</h2>
+
                 <p className="mt-2 text-sm text-slate-600">
                   Choose a subject or bundle to begin.
                 </p>
+
                 <Link
                   to="/"
                   className="mt-6 inline-flex rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-white">
@@ -365,7 +391,7 @@ export default function Checkout() {
                     <p className="mt-1 text-sm text-slate-500">
                       {user
                         ? "Your saved details are used for this purchase."
-                        : "No account is required before payment."}
+                        : "You can pay without creating an account first."}
                     </p>
                   </div>
 
@@ -414,15 +440,10 @@ export default function Checkout() {
                       }`}
                     />
 
-                    {user ? (
+                    {user && (
                       <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                         Signed in as {user.email}. This purchase will be added
                         to your existing library.
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-xs text-slate-500">
-                        Use an email address you can access. You will use an OTP
-                        sent to this email to open your PDF library later.
                       </p>
                     )}
                   </label>
@@ -451,13 +472,19 @@ export default function Checkout() {
 
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
                     <p className="font-bold">
-                      Important: enter correct details
+                      Important: use your correct details
                     </p>
+
                     <p className="mt-1 leading-6">
-                      Your purchase and secure PDF library are linked to this
-                      email address. You must be able to receive an OTP at this
-                      email to access your PDFs later. Please enter your own
-                      correct mobile number and email address.
+                      Enter your own active email address and correct 10-digit
+                      mobile number. After payment, your PDFs can only be
+                      accessed after verifying this email with a one-time code.
+                    </p>
+
+                    <p className="mt-2 leading-6">
+                      Incorrect email or mobile details may prevent access to
+                      your purchase. Your mobile number is saved with your order
+                      and may be used on personalized PDF watermarks.
                     </p>
                   </div>
 
@@ -493,14 +520,6 @@ export default function Checkout() {
                       role="alert"
                       className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
                       {error}
-                    </p>
-                  )}
-
-                  {notice && (
-                    <p
-                      role="status"
-                      className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-                      {notice}
                     </p>
                   )}
 

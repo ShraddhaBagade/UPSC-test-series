@@ -6,6 +6,20 @@ import {
   sendJson,
 } from "../serverless/examByteServer.js";
 
+function cleanText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanMobile(value) {
+  const digits = cleanText(value).replace(/\D/g, "");
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+
+  return /^\d{10}$/.test(digits) ? digits : "";
+}
+
 export default async function handler(req, res) {
   try {
     requireMethod(req, "GET");
@@ -23,11 +37,19 @@ export default async function handler(req, res) {
       throw new HttpError(500, "Could not load your saved details.");
     }
 
+    /*
+      New accounts may not have a database profile yet.
+      Use the name and mobile stored during registration until their
+      first checkout saves the permanent profile record.
+    */
+    const metadata = user.user_metadata || {};
+
     return sendJson(res, 200, {
       profile: {
-        fullName: profile?.full_name || "",
+        fullName:
+          cleanText(profile?.full_name) || cleanText(metadata.full_name),
         email: user.email?.trim().toLowerCase() || profile?.email || "",
-        mobile: profile?.mobile || "",
+        mobile: cleanMobile(profile?.mobile) || cleanMobile(metadata.mobile),
       },
     });
   } catch (error) {
