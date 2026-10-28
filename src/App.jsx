@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Checkout from "./pages/Checkout";
 import MyPurchases from "./pages/MyPurchases";
+import PaymentResult from "./pages/PaymentResult";
 import LegalPage from "./pages/LegalPage";
 import { AuthProvider } from "./lib/AuthContext";
 
@@ -643,6 +644,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/checkout" element={<Checkout />} />
+
+          <Route path="/payment-result" element={<PaymentResult />} />
           <Route path="/my-purchases" element={<MyPurchases />} />
 
           <Route path="/contact" element={<ContactPage />} />

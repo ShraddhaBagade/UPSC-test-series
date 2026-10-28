@@ -111,7 +111,7 @@ export default async function handler(req, res) {
           },
           order_note: `ExamByte — ${selection.title}`,
           order_meta: {
-            return_url: `${appUrl}/my-purchases?cashfree_order_id={order_id}`,
+            return_url: `${appUrl}/payment-result?cashfree_order_id={order_id}`,
             notify_url: `${appUrl}/api/cashfree-webhook`,
           },
         }),
