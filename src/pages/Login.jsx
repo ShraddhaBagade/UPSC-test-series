@@ -1,9 +1,21 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Mail } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth } from "../lib/AuthContext";
 import { supabase } from "../lib/supabase";
+
+function savedCheckoutEmail() {
+  try {
+    return (
+      JSON.parse(sessionStorage.getItem("examByteCheckoutDraft"))?.customer
+        ?.email || ""
+    );
+  } catch {
+    return "";
+  }
+}
 
 export default function Login() {
   const { user, loading } = useAuth();
@@ -11,64 +23,60 @@ export default function Login() {
   const [params] = useSearchParams();
 
   const requestedDestination = params.get("returnTo");
+
   const returnTo = ["/checkout", "/my-purchases"].includes(requestedDestination)
     ? requestedDestination
     : "/my-purchases";
 
-  const [method, setMethod] = useState("otp");
-  const [email, setEmail] = useState(() => {
-    try {
-      return (
-        JSON.parse(sessionStorage.getItem("examByteCheckoutDraft"))?.customer
-          ?.email || ""
-      );
-    } catch {
-      return "";
-    }
-  });
-  const [password, setPassword] = useState("");
+  const initialEmail =
+    params.get("email")?.trim().toLowerCase() || savedCheckoutEmail();
+
+  const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  if (loading) return <p className="p-8">Checking your login…</p>;
-  if (user) return <Navigate to={returnTo} replace />;
+  if (loading) {
+    return <p className="p-8">Checking your login…</p>;
+  }
 
-  async function handleSubmit(event) {
+  if (user) {
+    return <Navigate to={returnTo} replace />;
+  }
+
+  async function sendCode(event) {
     event.preventDefault();
     setError("");
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setBusy(true);
 
     try {
-      if (method === "password") {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password,
-        });
-
-        if (loginError) {
-          setError(loginError.message);
-          return;
-        }
-
-        navigate(returnTo, { replace: true });
-        return;
-      }
-
       const { error: sendError } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: { shouldCreateUser: false },
+        email: cleanEmail,
+        options: {
+          shouldCreateUser: false,
+        },
       });
 
       if (sendError) {
-        setError(sendError.message);
+        setError(
+          "We could not find an account for this email. Please create an account first.",
+        );
         return;
       }
 
+      setEmail(cleanEmail);
       setCodeSent(true);
     } catch {
-      setError("Could not complete login. Please try again.");
+      setError("Could not send your login code. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -87,7 +95,7 @@ export default function Login() {
       });
 
       if (verifyError) {
-        setError(verifyError.message);
+        setError("That code is invalid or has expired. Please try again.");
         return;
       }
 
@@ -99,53 +107,36 @@ export default function Login() {
     }
   }
 
+  const registerHref =
+    `/register?returnTo=${encodeURIComponent(returnTo)}` +
+    (email.trim()
+      ? `&email=${encodeURIComponent(email.trim().toLowerCase())}`
+      : "");
+
   return (
-    <div className="flex min-h-screen flex-col bg-amber-50 text-slate-900 dark:bg-slate-950 dark:text-white">
+    <div className="flex min-h-screen flex-col bg-[#f8fafc] text-slate-900 dark:bg-slate-950 dark:text-white">
       <Header />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-5 py-12">
-        <Link
-          to="/"
-          className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-          ← Back to notes
-        </Link>
+      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
+        <section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-9">
+          <h1 className="text-2xl font-extrabold">
+            {codeSent ? "Check your email" : "Log in"}
+          </h1>
 
-        <div className="mt-6 rounded-3xl bg-white p-7 shadow-lg dark:bg-slate-900">
-          <h1 className="text-2xl font-extrabold">Log in</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
             {codeSent
-              ? `Enter the one-time code sent to ${email}.`
-              : "Choose how you want to log in."}
+              ? `Enter the 6-digit code sent to ${email}.`
+              : "Enter your email address and we’ll send you a secure sign-in code."}
           </p>
 
-          {!codeSent && (
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              {[
-                ["otp", "Email code"],
-                ["password", "Password"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setMethod(value);
-                    setError("");
-                  }}
-                  className={`rounded-xl border px-3 py-3 text-sm font-bold ${
-                    method === value
-                      ? "border-amber-500 bg-amber-100 text-slate-950"
-                      : "border-slate-200 dark:border-slate-700"
-                  }`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {!codeSent ? (
-            <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+            <form onSubmit={sendCode} className="mt-7 space-y-5">
               <label className="block text-sm font-semibold">
-                Email address
+                <span className="inline-flex items-center gap-2">
+                  <Mail size={17} />
+                  Email address
+                </span>
+
                 <input
                   required
                   type="email"
@@ -153,64 +144,49 @@ export default function Login() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </label>
 
-              {method === "password" && (
-                <label className="block text-sm font-semibold">
-                  Password
-                  <input
-                    required
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
-                </label>
-              )}
-
               <button
                 disabled={busy}
-                className="w-full rounded-xl bg-amber-400 px-5 py-3 font-bold text-slate-950 disabled:opacity-50">
-                {busy
-                  ? method === "otp"
-                    ? "Sending code…"
-                    : "Logging in…"
-                  : method === "otp"
-                    ? "Send email code"
-                    : "Log in"}
+                className="w-full rounded-xl bg-amber-400 px-5 py-3.5 font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-50">
+                {busy ? "Sending code…" : "Continue"}
               </button>
             </form>
           ) : (
-            <form onSubmit={verifyCode} className="mt-6 space-y-5">
+            <form onSubmit={verifyCode} className="mt-7 space-y-5">
               <label className="block text-sm font-semibold">
-                One-time code
+                Verification code
                 <input
                   required
                   inputMode="numeric"
                   autoComplete="one-time-code"
+                  maxLength={6}
                   value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, ""))
+                  }
+                  placeholder="Enter 6-digit code"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-lg font-bold tracking-[0.3em] text-slate-900 outline-none transition placeholder:tracking-normal placeholder:text-sm placeholder:font-normal focus:border-amber-400 focus:ring-4 focus:ring-amber-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </label>
 
               <button
                 disabled={busy}
-                className="w-full rounded-xl bg-amber-400 px-5 py-3 font-bold text-slate-950 disabled:opacity-50">
-                {busy ? "Checking…" : "Verify and continue"}
+                className="w-full rounded-xl bg-amber-400 px-5 py-3.5 font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-50">
+                {busy ? "Verifying…" : "Log in"}
               </button>
 
               <button
                 type="button"
+                disabled={busy}
                 onClick={() => {
                   setCodeSent(false);
                   setCode("");
                   setError("");
                 }}
-                className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                className="w-full text-sm font-semibold text-slate-600 hover:text-amber-700 dark:text-slate-300 dark:hover:text-amber-300">
                 Use a different email
               </button>
             </form>
@@ -219,20 +195,23 @@ export default function Login() {
           {error && (
             <p
               role="alert"
-              className="mt-4 text-sm font-semibold text-rose-700 dark:text-rose-300">
+              className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
               {error}
             </p>
           )}
 
-          <p className="mt-5 text-center text-sm text-slate-600 dark:text-slate-300">
-            Need an account?{" "}
+          <div className="mt-7 border-t border-slate-100 pt-5 text-center dark:border-slate-800">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              New to ExamByte?
+            </p>
+
             <Link
-              to={`/register?returnTo=${encodeURIComponent(returnTo)}`}
-              className="font-semibold text-amber-700 dark:text-amber-300">
-              Register
+              to={registerHref}
+              className="mt-2 inline-block text-sm font-bold text-amber-700 hover:text-amber-800 dark:text-amber-300">
+              Create an account
             </Link>
-          </p>
-        </div>
+          </div>
+        </section>
       </main>
 
       <Footer />

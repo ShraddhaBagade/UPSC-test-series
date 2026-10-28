@@ -1,14 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LogIn, LogOut, Menu, Moon, Sun, UserPlus, X } from "lucide-react";
+import {
+  LogIn,
+  LogOut,
+  Menu,
+  Moon,
+  Sun,
+  UserPlus,
+  UserRound,
+  X,
+} from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { supabase } from "../lib/supabase";
 
 const navigation = [
   { label: "Study Material", href: "/#study-material" },
-  { label: "Bundles", href: "#bundles" },
-  { label: "Contact", href: "#contact" },
+  { label: "Bundles", href: "/#bundles" },
+  { label: "Contact", href: "/#contact" },
+  { label: "About", href: "/about" },
 ];
+
+const allowedDestinations = ["/checkout", "/my-purchases", "/account"];
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -19,7 +31,18 @@ export default function Header() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentPage = `${location.pathname}${location.search}${location.hash}`;
+
+  const searchParams = new URLSearchParams(location.search);
+  const requestedReturnTo = allowedDestinations.includes(location.pathname)
+    ? location.pathname
+    : searchParams.get("returnTo") || searchParams.get("redirect");
+
+  const returnTo = allowedDestinations.includes(requestedReturnTo)
+    ? requestedReturnTo
+    : "/my-purchases";
+
+  const loginHref = `/login?returnTo=${encodeURIComponent(returnTo)}`;
+  const registerHref = `/register?returnTo=${encodeURIComponent(returnTo)}`;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -80,11 +103,19 @@ export default function Header() {
                   title={user.email || ""}>
                   {user.email}
                 </span>
+
                 <Link
                   to="/my-purchases"
                   className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
                   My Study Notes
                 </Link>
+                <Link
+                  to="/account"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <UserRound size={16} />
+                  Account
+                </Link>
+
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -96,15 +127,14 @@ export default function Header() {
             ) : (
               <>
                 <Link
-                  to="/login"
-                  state={{ from: currentPage }}
+                  to={loginHref}
                   className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
                   <LogIn size={16} />
                   Login
                 </Link>
+
                 <Link
-                  to="/register"
-                  state={{ from: currentPage }}
+                  to={registerHref}
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300">
                   <UserPlus size={16} />
                   Register
@@ -149,12 +179,20 @@ export default function Header() {
                   <p className="truncate text-sm text-slate-500 dark:text-slate-400">
                     Signed in as {user.email}
                   </p>
+
                   <Link
                     to="/my-purchases"
                     onClick={() => setMenuOpen(false)}
                     className="block rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
                     My Study Notes
                   </Link>
+                  <Link
+                    to="/account"
+                    onClick={() => setMenuOpen(false)}
+                    className="block rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
+                    Account settings
+                  </Link>
+
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -165,20 +203,21 @@ export default function Header() {
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  <Link
-                    to="/login"
-                    state={{ from: currentPage }}
-                    onClick={() => setMenuOpen(false)}
-                    className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
-                    Login
-                  </Link>
-                  <Link
-                    to="/register"
-                    state={{ from: currentPage }}
-                    onClick={() => setMenuOpen(false)}
-                    className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white dark:bg-amber-400 dark:text-slate-950">
-                    Register
-                  </Link>
+                  <div className="flex gap-3">
+                    <Link
+                      to={loginHref}
+                      onClick={() => setMenuOpen(false)}
+                      className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
+                      Login
+                    </Link>
+
+                    <Link
+                      to={registerHref}
+                      onClick={() => setMenuOpen(false)}
+                      className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white dark:bg-amber-400 dark:text-slate-950">
+                      Register
+                    </Link>
+                  </div>
                 </div>
               ))}
           </nav>
