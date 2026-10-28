@@ -521,6 +521,90 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* About ExamByte */}
+        <section
+          id="about"
+          className="scroll-mt-20 border-t border-amber-100 bg-[#FFF9EA] px-6 py-20 dark:border-slate-800 dark:bg-slate-900">
+          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-amber-600 dark:text-amber-300">
+                Founder&apos;s note
+              </p>
+
+              <h2 className="mt-3 text-3xl font-extrabold leading-tight text-slate-900 dark:text-white sm:text-4xl">
+                Built from a real exam-preparation journey.
+              </h2>
+
+              <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600 dark:text-slate-300">
+                ExamByte was created for aspirants who want focused revision
+                material without feeling overwhelmed by scattered resources.
+              </p>
+
+              <a
+                href="/#study-material"
+                className="mt-7 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 font-bold text-white transition hover:bg-slate-800 dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300">
+                Explore study material
+                <ArrowRight size={17} />
+              </a>
+            </div>
+
+            <div className="rounded-3xl border border-amber-200 bg-white p-7 shadow-sm dark:border-slate-700 dark:bg-slate-950 sm:p-9">
+              <p className="text-lg font-bold text-slate-900 dark:text-white">
+                I&apos;m SHRADDHA SARANGDHAR BAGADE, the person behind ExamByte.
+              </p>
+
+              <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">
+                For the past six years, I have been preparing for competitive
+                government examinations, including UPSC and SSC CGL. I know how
+                difficult it can be to manage a large amount of material, revise
+                consistently, and identify what truly matters close to an exam.
+              </p>
+
+              <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">
+                ExamByte was created from that experience: to offer concise,
+                organised revision PDFs that help students focus on important
+                concepts, strengthen recall, and revise with more clarity.
+              </p>
+
+              <div className="mt-7 rounded-2xl bg-amber-50 p-5 dark:bg-amber-400/10">
+                <h3 className="font-extrabold text-slate-900 dark:text-white">
+                  ExamByte&apos;s approach
+                </h3>
+
+                <ul className="mt-4 space-y-3 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <li className="flex gap-3">
+                    <CheckCircle2
+                      size={19}
+                      className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    />
+                    Clear, exam-focused revision material
+                  </li>
+                  <li className="flex gap-3">
+                    <CheckCircle2
+                      size={19}
+                      className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    />
+                    Organised notes for quicker recall
+                  </li>
+                  <li className="flex gap-3">
+                    <CheckCircle2
+                      size={19}
+                      className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    />
+                    Honest support for serious aspirants
+                  </li>
+                </ul>
+              </div>
+
+              <p className="mt-6 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                ExamByte does not promise marks, ranks, or selection. Every
+                learner&apos;s outcome depends on their own preparation,
+                practice, and performance.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       <Footer />

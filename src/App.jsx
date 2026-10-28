@@ -9,6 +9,7 @@ import PaymentResult from "./pages/PaymentResult";
 import LegalPage from "./pages/LegalPage";
 import { AuthProvider } from "./lib/AuthContext";
 import Account from "./pages/Account";
+import About from "./pages/About";
 
 function ComingSoon({ title }) {
   return (
@@ -654,6 +655,7 @@ export default function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/about" element={<About />} />
 
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
         </Routes>

@@ -17,6 +17,7 @@ const navigation = [
   { label: "Study Material", href: "/#study-material" },
   { label: "Bundles", href: "/#bundles" },
   { label: "Contact", href: "/#contact" },
+  { label: "About", href: "/about" },
 ];
 
 const allowedDestinations = ["/checkout", "/my-purchases", "/account"];
