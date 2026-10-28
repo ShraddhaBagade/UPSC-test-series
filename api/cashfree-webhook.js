@@ -7,6 +7,7 @@ import {
   sendJson,
   verifyCashfreeWebhook,
 } from "../serverless/examByteServer.js";
+import { sendOrderReceipt } from "../serverless/receiptEmail.js";
 
 export const config = {
   api: {
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { received: true, pending: true });
     }
 
-    const paidAt = new Date().toISOString();
+    const paidAt = order.paid_at || new Date().toISOString();
 
     const { error: updateError } = await supabase
       .from("exambyte_orders")
@@ -113,6 +114,38 @@ export default async function handler(req, res) {
 
     if (purchaseError) {
       throw new HttpError(500, "Could not create purchase access.");
+    }
+
+    /*
+  Receipt email failure must never block payment fulfillment.
+  Resend's idempotency key prevents duplicate emails when Cashfree
+  sends the same webhook more than once.
+*/
+    if (!order.receipt_sent_at) {
+      try {
+        const { emailId } = await sendOrderReceipt({
+          order: {
+            ...order,
+            paid_at: paidAt,
+          },
+          subjects,
+          idempotencyKey: `exam-byte-receipt-${order.id}`,
+        });
+
+        await supabase
+          .from("exambyte_orders")
+          .update({
+            receipt_sent_at: new Date().toISOString(),
+            receipt_email_id: emailId,
+          })
+          .eq("id", order.id)
+          .is("receipt_sent_at", null);
+      } catch (receiptError) {
+        console.error(
+          "Payment was verified, but the receipt email could not be sent:",
+          receiptError,
+        );
+      }
     }
 
     return sendJson(res, 200, { received: true, paid: true });

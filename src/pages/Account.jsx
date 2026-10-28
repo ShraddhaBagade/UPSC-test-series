@@ -70,6 +70,9 @@ export default function Account() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [resendingOrderId, setResendingOrderId] = useState("");
+  const [receiptMessage, setReceiptMessage] = useState("");
+
   useEffect(() => {
     if (authLoading || !user) return;
 
@@ -157,6 +160,38 @@ export default function Account() {
     }
   }
 
+  async function resendReceipt(orderId) {
+    setResendingOrderId(orderId);
+    setReceiptMessage("");
+    setError("");
+
+    try {
+      const response = await authFetch("/api/resend-receipt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Could not resend your receipt.");
+      }
+
+      setReceiptMessage(result.message || "Your receipt has been sent.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not resend your receipt.",
+      );
+    } finally {
+      setResendingOrderId("");
+    }
+  }
+
   if (authLoading) {
     return <p className="p-8">Checking your account...</p>;
   }
@@ -168,7 +203,9 @@ export default function Account() {
         <main className="flex flex-1 items-center px-4 py-12">
           <section className="mx-auto max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
             <UserRound className="mx-auto h-12 w-12 text-amber-500" />
-            <h1 className="mt-5 text-2xl font-extrabold">Your ExamByte account</h1>
+            <h1 className="mt-5 text-2xl font-extrabold">
+              Your ExamByte account
+            </h1>
             <p className="mt-3 text-slate-600 dark:text-slate-300">
               Sign in using the email used at checkout to manage your profile,
               orders, and purchased study notes.
@@ -229,6 +266,12 @@ export default function Account() {
             </Link>
           </div>
 
+          {receiptMessage ? (
+            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
+              {receiptMessage}
+            </div>
+          ) : null}
+
           {error ? (
             <div className="mt-6 flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
               <CircleAlert className="mt-0.5 shrink-0" size={19} />
@@ -237,13 +280,17 @@ export default function Account() {
           ) : null}
 
           {loading ? (
-            <p className="py-14 text-center text-slate-500">Loading your account...</p>
+            <p className="py-14 text-center text-slate-500">
+              Loading your account...
+            </p>
           ) : (
             <>
               <section className="mt-8 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                   <ReceiptText className="text-amber-500" size={22} />
-                  <p className="mt-4 text-2xl font-extrabold">{purchases.length}</p>
+                  <p className="mt-4 text-2xl font-extrabold">
+                    {purchases.length}
+                  </p>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     Verified orders
                   </p>
@@ -275,7 +322,9 @@ export default function Account() {
                       <UserRound size={22} />
                     </span>
                     <div>
-                      <h2 className="text-xl font-extrabold">Profile settings</h2>
+                      <h2 className="text-xl font-extrabold">
+                        Profile settings
+                      </h2>
                       <p className="text-sm text-slate-500 dark:text-slate-400">
                         Keep your contact details up to date.
                       </p>
@@ -407,13 +456,25 @@ export default function Account() {
                           <p className="mt-3 break-all text-xs text-slate-500 dark:text-slate-400">
                             Order reference: {purchase.orderId}
                           </p>
+                          <button
+                            type="button"
+                            onClick={() => resendReceipt(purchase.orderId)}
+                            disabled={resendingOrderId === purchase.orderId}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                            <Mail size={15} />
+                            {resendingOrderId === purchase.orderId
+                              ? "Sending receipt..."
+                              : "Resend receipt"}
+                          </button>
                         </article>
                       ))}
                     </div>
                   ) : (
                     <div className="mt-6 rounded-2xl border border-dashed border-slate-300 p-6 text-center dark:border-slate-700">
                       <BookOpen className="mx-auto text-amber-500" size={28} />
-                      <h3 className="mt-3 font-extrabold">No verified purchases yet</h3>
+                      <h3 className="mt-3 font-extrabold">
+                        No verified purchases yet
+                      </h3>
                       <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                         If you bought as a guest, sign in with the same email
                         used during checkout. Your purchases will appear here
