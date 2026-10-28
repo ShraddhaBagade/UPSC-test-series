@@ -1,3 +1,4 @@
+import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import {
   HttpError,
   getPdfFilename,
@@ -6,6 +7,87 @@ import {
   requireUser,
   sendJson,
 } from "../serverless/examByteServer.js";
+
+const ORIGINAL_PDF_BUCKET = "exam-pdfs";
+const WATERMARKED_PDF_BUCKET = "exam-watermarked-pdfs";
+
+function safeWatermarkText(value, maximumLength = 90) {
+  const text = String(value ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[^\x20-\x7E]/g, "?")
+    .trim();
+
+  if (!text) return "Not available";
+
+  return text.length > maximumLength
+    ? `${text.slice(0, maximumLength - 3)}...`
+    : text;
+}
+
+function safeFilename(value) {
+  return String(value ?? "study-material")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+}
+
+async function createWatermarkedPdf(originalPdf, order) {
+  const pdfBytes = new Uint8Array(await originalPdf.arrayBuffer());
+  const pdf = await PDFDocument.load(pdfBytes, {
+    ignoreEncryption: true,
+  });
+
+  const font = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const watermarkLines = [
+    `ExamByte | Licensed to: ${safeWatermarkText(order.customer_name, 55)}`,
+    `Email: ${safeWatermarkText(order.customer_email, 55)}`,
+    `Mobile: ${safeWatermarkText(order.customer_mobile, 20)}`,
+    `Order: ${safeWatermarkText(order.cashfree_order_id, 40)} | Personal use only - Do not share`,
+  ];
+
+  for (const page of pdf.getPages()) {
+    const { width, height } = page.getSize();
+
+    const fontSize = Math.max(9, Math.min(15, width / 48));
+
+    const positions = [
+      { x: width * 0.08, y: height * 0.34 },
+      { x: width * 0.08, y: height * 0.68 },
+    ];
+
+    for (const position of positions) {
+      watermarkLines.forEach((line, index) => {
+        page.drawText(line, {
+          x: position.x,
+          y: position.y - index * (fontSize + 5),
+          size: fontSize,
+          font,
+          color: rgb(0.72, 0.05, 0.08),
+          opacity: 0.18,
+          rotate: degrees(32),
+        });
+      });
+    }
+  }
+
+  return pdf.save();
+}
+
+async function createPrivateDownloadUrl(supabase, storagePath, filename) {
+  const { data, error } = await supabase.storage
+    .from(WATERMARKED_PDF_BUCKET)
+    .createSignedUrl(storagePath, 60, {
+      download: filename,
+    });
+
+  if (error || !data?.signedUrl) {
+    console.error("Could not create personalized PDF download URL:", error);
+    throw new HttpError(500, "Could not prepare your PDF download.");
+  }
+
+  return data.signedUrl;
+}
 
 export default async function handler(req, res) {
   try {
@@ -27,7 +109,9 @@ export default async function handler(req, res) {
 
     const { data: order, error: orderError } = await supabase
       .from("exambyte_orders")
-      .select("id")
+      .select(
+        "id, cashfree_order_id, customer_name, customer_email, customer_mobile",
+      )
       .eq("cashfree_order_id", orderId)
       .eq("user_id", user.id)
       .eq("status", "paid")
@@ -49,22 +133,88 @@ export default async function handler(req, res) {
       throw new HttpError(403, "This PDF is not in your account.");
     }
 
-    const filename = getPdfFilename(subjectId);
+    const sourceFilename = getPdfFilename(subjectId);
 
-    const { data: signedFile, error: signedUrlError } = await supabase.storage
-      .from("exam-pdfs")
-      .createSignedUrl(filename, 60, {
-        download: filename,
-      });
+    const outputFilename = `ExamByte-${safeFilename(subjectId)}-${safeFilename(
+      order.cashfree_order_id,
+    )}.pdf`;
 
-    if (signedUrlError || !signedFile?.signedUrl) {
-      console.error("Could not create secure download URL:", signedUrlError);
-      throw new HttpError(500, "Could not prepare the PDF download.");
+    const { data: existingFile, error: existingFileError } = await supabase
+      .from("exambyte_watermarked_files")
+      .select("storage_path")
+      .eq("order_id", order.id)
+      .eq("subject_id", subjectId)
+      .maybeSingle();
+
+    if (existingFileError) {
+      throw new HttpError(500, "Could not check your personalized PDF.");
     }
 
+    if (existingFile?.storage_path) {
+      const url = await createPrivateDownloadUrl(
+        supabase,
+        existingFile.storage_path,
+        outputFilename,
+      );
+
+      return sendJson(res, 200, {
+        url,
+        filename: outputFilename,
+      });
+    }
+
+    const { data: originalPdf, error: originalPdfError } =
+      await supabase.storage.from(ORIGINAL_PDF_BUCKET).download(sourceFilename);
+
+    if (originalPdfError || !originalPdf) {
+      console.error("Could not load original ExamByte PDF:", originalPdfError);
+      throw new HttpError(500, "Could not prepare your PDF download.");
+    }
+
+    const watermarkedPdf = await createWatermarkedPdf(originalPdf, order);
+
+    const storagePath = `orders/${order.id}/${safeFilename(subjectId)}.pdf`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(WATERMARKED_PDF_BUCKET)
+      .upload(storagePath, watermarkedPdf, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Could not save personalized PDF:", uploadError);
+      throw new HttpError(500, "Could not create your personalized PDF.");
+    }
+
+    const { error: recordError } = await supabase
+      .from("exambyte_watermarked_files")
+      .upsert(
+        {
+          order_id: order.id,
+          user_id: user.id,
+          subject_id: subjectId,
+          storage_path: storagePath,
+        },
+        {
+          onConflict: "order_id,subject_id",
+        },
+      );
+
+    if (recordError) {
+      console.error("Could not save personalized PDF record:", recordError);
+      throw new HttpError(500, "Could not save your personalized PDF.");
+    }
+
+    const url = await createPrivateDownloadUrl(
+      supabase,
+      storagePath,
+      outputFilename,
+    );
+
     return sendJson(res, 200, {
-      url: signedFile.signedUrl,
-      filename,
+      url,
+      filename: outputFilename,
     });
   } catch (error) {
     console.error("Secure PDF download failed:", error);
