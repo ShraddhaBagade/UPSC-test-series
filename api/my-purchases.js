@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     */
     const { data: orders, error: ordersError } = await supabase
       .from("exambyte_orders")
-      .select("id, cashfree_order_id, title, paid_at")
+      .select("id, cashfree_order_id, title, paid_at, amount_paise, currency")
       .eq("user_id", user.id)
       .eq("status", "paid")
       .order("paid_at", { ascending: false });
@@ -134,6 +134,8 @@ export default async function handler(req, res) {
       return {
         orderId: order.cashfree_order_id,
         title: order.title,
+        amountPaise: order.amount_paise,
+        currency: order.currency || "INR",
         subjectIds: orderItems.map((item) => item.subject_id),
         subjects: orderItems.map((item) => item.subject_title),
         capturedAt: order.paid_at,

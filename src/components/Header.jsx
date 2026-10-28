@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LogIn, LogOut, Menu, Moon, Sun, UserPlus, X } from "lucide-react";
+import {
+  LogIn,
+  LogOut,
+  Menu,
+  Moon,
+  Sun,
+  UserPlus,
+  UserRound,
+  X,
+} from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -10,7 +19,7 @@ const navigation = [
   { label: "Contact", href: "/#contact" },
 ];
 
-const allowedDestinations = ["/checkout", "/my-purchases"];
+const allowedDestinations = ["/checkout", "/my-purchases", "/account"];
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -99,6 +108,12 @@ export default function Header() {
                   className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
                   My Study Notes
                 </Link>
+                <Link
+                  to="/account"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <UserRound size={16} />
+                  Account
+                </Link>
 
                 <button
                   type="button"
@@ -169,6 +184,12 @@ export default function Header() {
                     onClick={() => setMenuOpen(false)}
                     className="block rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
                     My Study Notes
+                  </Link>
+                  <Link
+                    to="/account"
+                    onClick={() => setMenuOpen(false)}
+                    className="block rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white">
+                    Account settings
                   </Link>
 
                   <button

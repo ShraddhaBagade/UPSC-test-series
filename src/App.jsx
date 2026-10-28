@@ -8,6 +8,7 @@ import MyPurchases from "./pages/MyPurchases";
 import PaymentResult from "./pages/PaymentResult";
 import LegalPage from "./pages/LegalPage";
 import { AuthProvider } from "./lib/AuthContext";
+import Account from "./pages/Account";
 
 function ComingSoon({ title }) {
   return (
@@ -647,12 +648,13 @@ export default function App() {
 
           <Route path="/payment-result" element={<PaymentResult />} />
           <Route path="/my-purchases" element={<MyPurchases />} />
-
+          <Route path="/account" element={<Account />} />
           <Route path="/contact" element={<ContactPage />} />
 
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
           <Route path="/terms" element={<TermsPage />} />
+
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
         </Routes>
       </AuthProvider>
