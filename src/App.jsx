@@ -488,7 +488,8 @@ function PrivacyPolicyPage() {
 
         <ul className="mt-3 list-disc space-y-2 pl-5 text-slate-600">
           <li>
-            Name and email address used to create an account or place an order.
+            Name, email address, and mobile number used to create an account or
+            place an order.
           </li>
           <li>
             Order details, including purchased PDFs and selected bundle
@@ -529,6 +530,13 @@ function PrivacyPolicyPage() {
         <ul className="mt-3 list-disc space-y-2 pl-5 text-slate-600">
           <li>To process payments and confirm orders.</li>
           <li>To provide access to purchased digital PDFs.</li>
+
+          <li>
+            To create a personalised watermark on purchased PDFs containing your
+            name, email address, mobile number, and order ID to help prevent
+            unauthorised sharing, copying, or resale.
+          </li>
+
           <li>
             To respond to delivery, payment, technical, or support requests.
           </li>
