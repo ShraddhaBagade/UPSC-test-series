@@ -17,7 +17,7 @@ import {
 
 const ORIGINAL_PDF_BUCKET = "exam-pdfs";
 const WATERMARKED_PDF_BUCKET = "exam-watermarked-pdfs";
-const WATERMARK_VERSION = 2;
+const WATERMARK_VERSION = 3;
 
 function safeWatermarkText(value, maximumLength = 90) {
   const text = String(value ?? "")
@@ -74,9 +74,22 @@ function drawWatermarkBlock(page, font, lines, centerX, centerY, fontSize) {
 async function createWatermarkedPdf(originalPdf, order) {
   const pdfBytes = new Uint8Array(await originalPdf.arrayBuffer());
 
-  const pdf = await PDFDocument.load(pdfBytes, {
+  /*
+    Some source PDFs contain damaged metadata, outlines, or cross-references.
+    Copying their pages into a brand-new PDF removes that broken structure.
+  */
+  const sourcePdf = await PDFDocument.load(pdfBytes, {
     ignoreEncryption: true,
   });
+
+  const pdf = await PDFDocument.create();
+
+  const copiedPages = await pdf.copyPages(
+    sourcePdf,
+    sourcePdf.getPageIndices(),
+  );
+
+  copiedPages.forEach((page) => pdf.addPage(page));
 
   const font = await pdf.embedFont(StandardFonts.HelveticaBold);
 
@@ -119,10 +132,6 @@ async function createWatermarkedPdf(originalPdf, order) {
     );
   }
 
-  /*
-    Object streams can cause compatibility problems in older iPhone Safari.
-    Disabling them creates a more broadly compatible PDF.
-  */
   return pdf.save({
     useObjectStreams: false,
     addDefaultPage: false,
